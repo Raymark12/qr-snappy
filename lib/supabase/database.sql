@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email TEXT,
-  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  role TEXT DEFAULT 'user' CHECK (role IN ('admin', 'user', 'client')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -22,6 +22,16 @@ CREATE TABLE IF NOT EXISTS events (
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create event_assignments table
+CREATE TABLE IF NOT EXISTS event_assignments (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
+  client_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  assigned_by UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(event_id, client_id)
 );
 
 -- Create photos table
@@ -40,6 +50,7 @@ CREATE TABLE IF NOT EXISTS photos (
 -- Enable Row Level Security
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles
@@ -53,18 +64,33 @@ CREATE POLICY "Users can insert their own profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- RLS Policies for events
-CREATE POLICY "Admins can view their own events" ON events
+-- Admins can see all events (active or not)
+CREATE POLICY "Admins can view all events" ON events
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM profiles 
       WHERE profiles.id = auth.uid() 
-      AND (profiles.role = 'admin' OR events.admin_id = auth.uid())
+      AND profiles.role = 'admin'
     )
   );
 
+-- Clients can see events assigned to them
+CREATE POLICY "Clients can view assigned events" ON events
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      JOIN event_assignments ea ON ea.client_id = p.id
+      WHERE p.id = auth.uid() 
+      AND p.role = 'client'
+      AND ea.event_id = events.id
+    )
+  );
+
+-- Anonymous users can view active events (for QR/link access)
 CREATE POLICY "Anyone can view active events" ON events
   FOR SELECT USING (is_active = true);
 
+-- Only admins can create events
 CREATE POLICY "Admins can insert events" ON events
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -74,6 +100,7 @@ CREATE POLICY "Admins can insert events" ON events
     )
   );
 
+-- Admins can update their own events, clients can update events assigned to them
 CREATE POLICY "Admins can update their own events" ON events
   FOR UPDATE USING (
     EXISTS (
@@ -84,6 +111,18 @@ CREATE POLICY "Admins can update their own events" ON events
     )
   );
 
+CREATE POLICY "Clients can update assigned events" ON events
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      JOIN event_assignments ea ON ea.client_id = p.id
+      WHERE p.id = auth.uid() 
+      AND p.role = 'client'
+      AND ea.event_id = events.id
+    )
+  );
+
+-- Only admins can delete events
 CREATE POLICY "Admins can delete their own events" ON events
   FOR DELETE USING (
     EXISTS (
@@ -91,6 +130,58 @@ CREATE POLICY "Admins can delete their own events" ON events
       WHERE profiles.id = auth.uid() 
       AND profiles.role = 'admin'
       AND events.admin_id = auth.uid()
+    )
+  );
+
+-- RLS Policies for event_assignments
+-- Admins can view all event assignments
+CREATE POLICY "Admins can view all event assignments" ON event_assignments
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
+    )
+  );
+
+-- Clients can view their own assignments
+CREATE POLICY "Clients can view their own assignments" ON event_assignments
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'client'
+      AND event_assignments.client_id = auth.uid()
+    )
+  );
+
+-- Only admins can create event assignments
+CREATE POLICY "Admins can insert event assignments" ON event_assignments
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
+    )
+  );
+
+-- Only admins can update event assignments
+CREATE POLICY "Admins can update event assignments" ON event_assignments
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
+    )
+  );
+
+-- Only admins can delete event assignments
+CREATE POLICY "Admins can delete event assignments" ON event_assignments
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE profiles.id = auth.uid() 
+      AND profiles.role = 'admin'
     )
   );
 
@@ -140,10 +231,13 @@ CREATE POLICY "Event admins can delete photos from their events" ON photos
     )
   );
 
--- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_events_admin_id ON events(admin_id);
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at);
 CREATE INDEX IF NOT EXISTS idx_events_is_active ON events(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_event_assignments_event_id ON event_assignments(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_assignments_client_id ON event_assignments(client_id);
+CREATE INDEX IF NOT EXISTS idx_event_assignments_assigned_by ON event_assignments(assigned_by);
 
 CREATE INDEX IF NOT EXISTS idx_photos_event_id ON photos(event_id);
 CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(status);
