@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
 import { createMetadata } from '@/lib/metadata'
-import DashboardClient from '@/components/admin/DashboardClient'
+import DashboardComponent from '@/components/admin/DashboardComponent'
 
 export const metadata: Metadata = createMetadata({
   title: 'Dashboard',
   description: 'Manage your QR Snappy events and photos',
   noIndex: true,
-  path: '/dashboard'
+  path: '/dashboard',
 })
 
-export default function Dashboard() {
-  return <DashboardClient />
+export default function DashboardPage() {
+  return <DashboardComponent />
 }
