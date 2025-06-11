@@ -5,6 +5,7 @@ export type Enums<T extends keyof Database['public']['Enums']> = Database['publi
 
 export type Profile = Tables<'profiles'>
 export type Event = Tables<'events'>
+export type EventAssignment = Tables<'event_assignments'>
 export type Photo = Tables<'photos'>
 
 export type EventWithDetails = Event & {
@@ -15,6 +16,12 @@ export type EventWithDetails = Event & {
     approved_photos: number
     pending_photos: number
   }
+}
+
+export type EventAssignmentWithDetails = EventAssignment & {
+  events: Pick<Event, 'title' | 'description' | 'is_active'>
+  client: Pick<Profile, 'email'>
+  assigned_by_profile: Pick<Profile, 'email'>
 }
 
 export type PhotoWithEvent = Photo & {
@@ -48,7 +55,7 @@ export type ApiResponse<T> = {
   message?: string
 }
 
-export type UserRole = 'admin' | 'user'
+export type UserRole = 'admin' | 'user' | 'client'
 
 export type AuthUser = {
   id: string

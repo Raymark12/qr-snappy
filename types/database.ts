@@ -13,19 +13,19 @@ export interface Database {
         Row: {
           id: string
           email: string | null
-          role: 'admin' | 'user'
+          role: 'admin' | 'user' | 'client'
           created_at: string
         }
         Insert: {
           id: string
           email?: string | null
-          role?: 'admin' | 'user'
+          role?: 'admin' | 'user' | 'client'
           created_at?: string
         }
         Update: {
           id?: string
           email?: string | null
-          role?: 'admin' | 'user'
+          role?: 'admin' | 'user' | 'client'
           created_at?: string
         }
         Relationships: [
@@ -72,6 +72,49 @@ export interface Database {
           {
             foreignKeyName: "events_admin_id_fkey"
             columns: ["admin_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      event_assignments: {
+        Row: {
+          id: string
+          event_id: string
+          client_id: string
+          assigned_by: string
+          assigned_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          client_id: string
+          assigned_by: string
+          assigned_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          client_id?: string
+          assigned_by?: string
+          assigned_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_assignments_event_id_fkey"
+            columns: ["event_id"]
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_assignments_client_id_fkey"
+            columns: ["client_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           }
