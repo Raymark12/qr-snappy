@@ -1,8 +1,6 @@
-
-import { shallow } from 'zustand/shallow'
 import { useAuthStore } from '@/stores/authStore'
 import type { AuthUser } from '@/types'
-
+import { shallow } from 'zustand/shallow'
 
 export const useAuth = () => {
   return useAuthStore(
@@ -27,4 +25,7 @@ export const useIsAdmin = (): boolean => {
   return useAuthStore((state) => state.isAdmin)
 }
 
+export const useLogout = () => {
+  return useAuthStore((state) => state.logout)
+}
 
