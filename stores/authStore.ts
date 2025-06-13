@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createWithEqualityFn } from 'zustand/traditional'
 import { persist } from 'zustand/middleware'
 import { supabase } from '@/lib/supabase/client'
 import type { AuthUser, UserRole } from '@/types'
@@ -17,7 +17,7 @@ interface AuthState {
   initialize: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthState>()(
+export const useAuthStore = createWithEqualityFn<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
