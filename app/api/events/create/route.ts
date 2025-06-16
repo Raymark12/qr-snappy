@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Validate request body
     const validationResult = createEventSchema.safeParse(body)
     if (!validationResult.success) {
       return NextResponse.json(
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single<{ role: 'admin' | 'user' }>()
+      .single<{ role: 'admin' | 'user' | 'client' }>()
 
     if (!profile || profile.role !== 'admin') {
       return NextResponse.json(
@@ -54,7 +53,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash the password using bcrypt
     const hashedPassword = await hashPassword(password)
 
     // Create the event with explicit type assertion
