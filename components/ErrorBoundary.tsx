@@ -1,6 +1,6 @@
 'use client'
 
-import { Component, ReactNode } from 'react'
+import { Component, ReactNode, ErrorInfo } from 'react'
 import { Box, Button, Container, Typography } from '@mui/material'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 
@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo)
   }
 
@@ -54,11 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <Typography variant="body1" color="text.secondary" gutterBottom>
               {this.state.error?.message || 'An unexpected error occurred'}
             </Typography>
-            <Button
-              variant="contained"
-              onClick={() => window.location.reload()}
-              sx={{ mt: 2 }}
-            >
+            <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
               Reload Page
             </Button>
           </Box>
@@ -69,4 +65,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children
   }
 }
-
