@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS photos (
   user_email TEXT,
   file_path TEXT NOT NULL,
   file_name TEXT NOT NULL,
+  author TEXT,
+  comment TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   reviewed_at TIMESTAMP WITH TIME ZONE,
@@ -273,3 +275,81 @@ DROP TRIGGER IF EXISTS handle_events_updated_at ON events;
 CREATE TRIGGER handle_events_updated_at
   BEFORE UPDATE ON events
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+
+-- 2. Allow authenticated users to upload photos
+CREATE POLICY "Allow authenticated uploads to Photos bucket"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'Photos'
+  AND (
+    -- Admin can upload to any event
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+    OR
+    -- Client can upload if assigned to the event
+    EXISTS (
+      SELECT 1 
+      FROM public.event_assignments 
+      WHERE client_id = auth.uid() 
+      AND event_id = (storage.foldername(name))[1]::uuid
+    )
+  )
+);
+
+-- 3. Allow users to view photos from their assigned events
+CREATE POLICY "Allow authenticated reads from Photos bucket"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'Photos'
+  AND (
+    -- Admin can view all photos
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+    OR
+    -- Client can view photos from assigned events
+    EXISTS (
+      SELECT 1 
+      FROM public.event_assignments 
+      WHERE client_id = auth.uid() 
+      AND event_id = (storage.foldername(name))[1]::uuid
+    )
+  )
+);
+
+-- 4. Only admins can delete photos
+CREATE POLICY "Only admins can delete from Photos bucket"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'Photos'
+  AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+);
+
+-- Performance indexes
+-- Add indexes for better photo query performance
+CREATE INDEX IF NOT EXISTS idx_photos_event_status_uploaded 
+ON photos(event_id, status, uploaded_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_status_uploaded 
+ON photos(status, uploaded_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_photos_user_email 
+ON photos(user_email) WHERE user_email IS NOT NULL;
+
+-- 5. Only admins can update/move photos
+CREATE POLICY "Only admins can update Photos bucket"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'Photos'
+  AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+)
+WITH CHECK (
+  bucket_id = 'Photos'
+  AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+);

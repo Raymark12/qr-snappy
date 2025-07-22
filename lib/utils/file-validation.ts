@@ -1,0 +1,65 @@
+import { FILE_UPLOAD, STORAGE } from '@/lib/constants'
+
+export interface FileValidationResult {
+  valid: boolean
+  error?: string
+}
+
+export function validateFileType(file: File): FileValidationResult {
+  const allowedTypes: readonly string[] = FILE_UPLOAD.ALLOWED_TYPES
+  if (!allowedTypes.includes(file.type)) {
+    return {
+      valid: false,
+      error: `Unsupported file type. Allowed types: ${FILE_UPLOAD.ALLOWED_EXTENSIONS.join(', ')}`,
+    }
+  }
+
+  return { valid: true }
+}
+
+export function validateFileSize(file: File): FileValidationResult {
+  if (file.size > FILE_UPLOAD.MAX_SIZE_BYTES) {
+    return {
+      valid: false,
+      error: `File too large. Maximum size: ${FILE_UPLOAD.MAX_SIZE_DISPLAY}`,
+    }
+  }
+
+  return { valid: true }
+}
+
+export function validateFile(file: File): FileValidationResult {
+  const typeValidation = validateFileType(file)
+  if (!typeValidation.valid) {
+    return typeValidation
+  }
+
+  const sizeValidation = validateFileSize(file)
+  if (!sizeValidation.valid) {
+    return sizeValidation
+  }
+
+  return { valid: true }
+}
+
+export function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+export function getPhotoStoragePath(eventId: string, filename: string): string {
+  const safeName = sanitizeFilename(filename)
+  const objectName = `${crypto.randomUUID()}-${safeName}`
+  return `${STORAGE.BUCKET_NAME}/${eventId}/${objectName}`
+}
+
+export function parseStoragePath(fullPath: string): {
+  bucket: string
+  path: string
+} {
+  const [bucket, ...rest] = fullPath.split('/')
+  return {
+    bucket,
+    path: rest.join('/'),
+  }
+}
+
