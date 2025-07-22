@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { createMetadata } from '@/lib/metadata'
 import { getEventById } from '@/lib/db/events'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/utils/auth-helpers'
+import { isUserAssignedToEvent } from '@/lib/db/event-assignments'
 import AdminLayout from '@/components/global/AdminLayout'
 import EventPhotos from '@/components/events/photos/EventPhotos'
 import EventNotAvailable from '@/components/events/common/EventNotAvailable'
@@ -47,9 +50,20 @@ export default async function EventPhotosPage({ params }: EventPhotosPageProps) 
     )
   }
 
+  const supabase = await createServerSupabaseClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity
+  const currentUser = await getCurrentUser(supabase as any)
+
+  let canUpload = false
+  if (currentUser) {
+    const isUserAdmin = currentUser.role === 'admin'
+    const isAssigned = isUserAdmin ? true : await isUserAssignedToEvent(event.id, currentUser.id)
+    canUpload = isUserAdmin || isAssigned
+  }
+
   return (
     <AdminLayout>
-      <EventPhotos event={event} />
+      <EventPhotos event={event} canUpload={canUpload} />
     </AdminLayout>
   )
 }

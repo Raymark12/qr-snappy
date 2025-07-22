@@ -1,17 +1,22 @@
-import { Box, Button } from '@mui/material'
+'use client'
+
+import { Box, Button, CircularProgress, Alert } from '@mui/material'
 import { ArrowBack as BackIcon } from '@mui/icons-material'
 import Link from 'next/link'
 import type { Event } from '@/types'
+import { useEventPhotos } from '@/hooks/usePhotos'
+import PhotosGrid from './PhotosGrid'
+import PhotoUploader from './PhotoUploader'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 interface EventPhotosProps {
   event: Event
+  canUpload: boolean
 }
 
-/**
- * Event Photos Component
- * Displays photos for a specific event
- */
-export default function EventPhotos({ event }: EventPhotosProps) {
+export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
+  const { data: photos, isLoading, error } = useEventPhotos(event.id)
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Box sx={{ mb: 4 }}>
@@ -27,12 +32,34 @@ export default function EventPhotos({ event }: EventPhotosProps) {
         {event.description && <p className="text-gray-600">{event.description}</p>}
       </div>
 
-      {/* Photos content will go here */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-4">Event Photos</h2>
-        <p className="text-gray-500">
-          Photo upload and viewing functionality will be implemented here.
-        </p>
+
+        {canUpload && (
+          <ErrorBoundary>
+            <div className="mb-6">
+              <PhotoUploader eventId={event.id} />
+            </div>
+          </ErrorBoundary>
+        )}
+
+        {isLoading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Failed to load photos. Please try again.
+          </Alert>
+        )}
+
+        {!isLoading && !error && photos && (
+          <ErrorBoundary>
+            <PhotosGrid photos={photos} />
+          </ErrorBoundary>
+        )}
       </div>
     </div>
   )
