@@ -127,6 +127,8 @@ export interface Database {
           user_email: string | null
           file_path: string
           file_name: string
+          author: string | null
+          comment: string | null
           status: 'pending' | 'approved' | 'rejected'
           uploaded_at: string
           reviewed_at: string | null
@@ -138,6 +140,8 @@ export interface Database {
           user_email?: string | null
           file_path: string
           file_name: string
+          author?: string | null
+          comment?: string | null
           status?: 'pending' | 'approved' | 'rejected'
           uploaded_at?: string
           reviewed_at?: string | null
@@ -149,6 +153,8 @@ export interface Database {
           user_email?: string | null
           file_path?: string
           file_name?: string
+          author?: string | null
+          comment?: string | null
           status?: 'pending' | 'approved' | 'rejected'
           uploaded_at?: string
           reviewed_at?: string | null

@@ -28,33 +28,6 @@ export type PhotoWithEvent = Photo & {
   events: Pick<Event, 'title' | 'admin_id'>
 }
 
-export type CreateEventInput = {
-  title: string
-  description?: string
-  password: string
-}
-
-export type UploadPhotoInput = {
-  eventId: string
-  file: File
-  userEmail?: string
-}
-
-export type UploadItem = {
-  id: string
-  file: File
-  eventId: string
-  status: 'pending' | 'uploading' | 'success' | 'error'
-  progress: number
-  error?: string
-}
-
-export type ApiResponse<T> = {
-  data?: T
-  error?: string
-  message?: string
-}
-
 export type UserRole = 'admin' | 'user' | 'client'
 
 export type AuthUser = {
