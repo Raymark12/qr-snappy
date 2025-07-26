@@ -1,19 +1,16 @@
 import { createWithEqualityFn } from 'zustand/traditional'
 import { persist } from 'zustand/middleware'
-import { supabase } from '@/lib/supabase/client'
+import { createSupabaseClient } from '@/lib/supabase/client'
 import type { AuthUser, UserRole } from '@/types'
-import type { Database } from '@/types/database'
 
 interface AuthState {
   user: AuthUser | null
   isLoading: boolean
-  isAdmin: boolean
 
   // Actions
   setUser: (user: AuthUser | null) => void
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
-  checkAdmin: () => boolean
   initialize: () => Promise<void>
 }
 
@@ -22,12 +19,10 @@ export const useAuthStore = createWithEqualityFn<AuthState>()(
     (set, get) => ({
       user: null,
       isLoading: true,
-      isAdmin: false,
 
       setUser: (user) => {
         set({
           user,
-          isAdmin: user?.role === 'admin',
           isLoading: false
         })
       },
@@ -36,6 +31,7 @@ export const useAuthStore = createWithEqualityFn<AuthState>()(
         try {
           set({ isLoading: true })
 
+          const supabase = createSupabaseClient()
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -59,30 +55,17 @@ export const useAuthStore = createWithEqualityFn<AuthState>()(
               set({ isLoading: false })
               return { success: false, error: 'Failed to fetch user profile' }
             }
-            // If user profile is not found, create it
-            if (!profile) {
-              const profileInsert: Database['public']['Tables']['profiles']['Insert'] = {
-                id: data.user.id,
-                email: data.user.email || null,
-                role: 'user'
-              }
-              // Create user profile
-              const { error: insertError } = await supabase
-                .from('profiles')
-                // @ts-expect-error - TypeScript has issues inferring Supabase insert types
-                .insert(profileInsert)
 
-              if (insertError) {
-                console.error('Profile creation error:', insertError)
-                set({ isLoading: false })
-                return { success: false, error: 'Failed to create user profile' }
-              }
+            if (!profile) {
+              console.error('CRITICAL: Profile missing for user', data.user.id)
+              set({ isLoading: false })
+              return { success: false, error: 'Account setup incomplete. Please contact support.' }
             }
 
             const authUser: AuthUser = {
               id: data.user.id,
-              email: data.user.email || 'unknown@user.com',
-              role: profile?.role || 'user',
+              email: data.user.email ?? '',
+              role: profile.role,
             }
 
             get().setUser(authUser)
@@ -99,19 +82,17 @@ export const useAuthStore = createWithEqualityFn<AuthState>()(
 
       logout: async () => {
         try {
+          const supabase = createSupabaseClient()
           await supabase.auth.signOut()
-          set({ user: null, isAdmin: false, isLoading: false })
+          set({ user: null, isLoading: false })
         } catch (error) {
           console.error('Logout error:', error)
         }
       },
 
-      checkAdmin: () => {
-        return get().user?.role === 'admin'
-      },
-
       initialize: async () => {
         try {
+          const supabase = createSupabaseClient()
           const { data: { session } } = await supabase.auth.getSession()
 
           if (session?.user) {
@@ -123,34 +104,29 @@ export const useAuthStore = createWithEqualityFn<AuthState>()(
 
             if (profileError) {
               console.error('Profile fetch error during initialization:', profileError)
+              set({ user: null, isLoading: false })
+              return
             }
-            // If user profile is not found, create it
-            if (!profile && !profileError) {
-              const profileInsert: Database['public']['Tables']['profiles']['Insert'] = {
-                id: session.user.id,
-                email: session.user.email || null,
-                role: 'user'
-              }
 
-              await supabase
-                .from('profiles')
-                // @ts-expect-error - Supabase type inference issue with RLS policies
-                .insert(profileInsert)
+            if (!profile) {
+              console.error('CRITICAL: Profile missing for user', session.user.id)
+              set({ user: null, isLoading: false })
+              return
             }
 
             const authUser: AuthUser = {
               id: session.user.id,
-              email: session.user.email || 'unknown@user.com',
-              role: profile?.role || 'user',
+              email: session.user.email ?? '',
+              role: profile.role,
             }
 
             get().setUser(authUser)
           } else {
-            set({ user: null, isAdmin: false, isLoading: false })
+            set({ user: null, isLoading: false })
           }
         } catch (error) {
           console.error('Auth initialization error:', error)
-          set({ user: null, isAdmin: false, isLoading: false })
+          set({ user: null, isLoading: false })
         }
       },
     }),

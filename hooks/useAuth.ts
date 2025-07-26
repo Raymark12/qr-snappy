@@ -1,12 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
-import { supabase } from '@/lib/supabase/client'
+import { createSupabaseClient } from '@/lib/supabase/client'
 import type { LoginInput } from '@/lib/validations'
+import { shallow } from 'zustand/shallow'
 
 export const authKeys = {
   all: ['auth'] as const,
   user: () => [...authKeys.all, 'user'] as const,
   profile: (id: string) => [...authKeys.all, 'profile', id] as const,
+}
+
+export const useAuth = () => {
+  return useAuthStore(
+    (state) => ({
+      user: state.user,
+      isLoading: state.isLoading,
+      isAdmin: state.user?.role === 'admin',
+    }),
+    shallow
+  )
+}
+
+export const useIsAuthLoading = (): boolean => {
+  return useAuthStore((state) => state.isLoading)
 }
 
 export const useUserProfile = () => {
@@ -17,6 +33,7 @@ export const useUserProfile = () => {
     queryFn: async () => {
       if (!user?.id) throw new Error('No user ID')
 
+      const supabase = createSupabaseClient()
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -57,6 +74,6 @@ export const useLogout = () => {
 }
 
 export const useIsAdmin = () => {
-  const checkAdmin = useAuthStore(state => state.checkAdmin)
-  return checkAdmin()
+  const user = useAuthStore(state => state.user)
+  return user?.role === 'admin'
 }

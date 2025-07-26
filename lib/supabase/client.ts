@@ -29,4 +29,3 @@ export const createSupabaseAdmin = () => {
   )
 }
 
-export const supabase = createSupabaseClient()
