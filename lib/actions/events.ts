@@ -2,14 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { z } from 'zod'
-import bcrypt from 'bcrypt'
-
-const createEventSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100, 'Title too long'),
-  description: z.string().max(500, 'Description too long').optional(),
-  password: z.string().min(4, 'Password must be at least 4 characters'),
-})
+import { createEventSchema } from '@/lib/validations'
+import { hashPassword } from '@/lib/utils/password-server'
+import { getCurrentUser } from '@/lib/utils/auth-helpers'
 
 type CreateEventResult = {
   success: boolean
@@ -21,26 +16,17 @@ export async function createEvent(formData: FormData): Promise<CreateEventResult
   try {
     const supabase = await createServerSupabaseClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity
+    const currentUser = await getCurrentUser(supabase as any)
 
-    if (!user) {
+    if (!currentUser) {
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single<{ role: 'admin' | 'user' | 'client' }>()
-
-    if (!profile || profile.role !== 'admin') {
+    if (currentUser.role !== 'admin') {
       return { success: false, error: 'Only admins can create events' }
     }
 
-    // Parse and validate input
     const rawData = {
       title: formData.get('title'),
       description: formData.get('description') || '',
@@ -58,7 +44,7 @@ export async function createEvent(formData: FormData): Promise<CreateEventResult
 
     const { title, description, password } = validation.data
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await hashPassword(password)
 
     // Create event
     const { data, error } = await supabase
@@ -68,7 +54,7 @@ export async function createEvent(formData: FormData): Promise<CreateEventResult
         title,
         description: description || null,
         password: hashedPassword,
-        admin_id: user.id,
+        admin_id: currentUser.id,
         is_active: true,
       })
       .select('id')
@@ -109,30 +95,22 @@ export async function deleteEvent(eventId: string): Promise<DeleteEventResult> {
   try {
     const supabase = await createServerSupabaseClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity
+    const currentUser = await getCurrentUser(supabase as any)
 
-    if (!user) {
+    if (!currentUser) {
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single<{ role: 'admin' | 'user' | 'client' }>()
-
-    if (!profile || profile.role !== 'admin') {
+    if (currentUser.role !== 'admin') {
       return { success: false, error: 'Only admins can delete events' }
     }
 
-    const { error } = await supabase.from('events').delete().eq('id', eventId)
+    const { error: deleteError } = await supabase.from('events').delete().eq('id', eventId)
 
-    if (error) {
-      console.error('Error deleting event:', error)
-      return { success: false, error: 'Failed to delete event' }
+    if (deleteError) {
+      console.error('Error deleting event:', deleteError)
+      return { success: false, error: `Failed to delete event: ${deleteError.message}` }
     }
 
     revalidatePath('/dashboard/events')
@@ -153,35 +131,27 @@ export async function toggleEventActive(eventId: string, isActive: boolean): Pro
   try {
     const supabase = await createServerSupabaseClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity
+    const currentUser = await getCurrentUser(supabase as any)
 
-    if (!user) {
+    if (!currentUser) {
       return { success: false, error: 'Unauthorized' }
     }
 
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single<{ role: 'admin' | 'user' | 'client' }>()
-
-    if (!profile || profile.role !== 'admin') {
+    if (currentUser.role !== 'admin') {
       return { success: false, error: 'Only admins can modify events' }
     }
 
     // Update event
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from('events')
       // @ts-expect-error - TypeScript has issues inferring Supabase update types
       .update({ is_active: isActive })
       .eq('id', eventId)
 
-    if (error) {
-      console.error('Error updating event:', error)
-      return { success: false, error: 'Failed to update event' }
+    if (updateError) {
+      console.error('Error updating event:', updateError)
+      return { success: false, error: `Failed to update event: ${updateError.message}` }
     }
 
     revalidatePath('/dashboard/events')

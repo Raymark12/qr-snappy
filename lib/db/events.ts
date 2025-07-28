@@ -4,7 +4,7 @@ import type { Event, EventWithDetails } from '@/types'
 export async function getEvents(): Promise<EventWithDetails[]> {
   const supabase = await createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data: eventsData, error: fetchError } = await supabase
     .from('events')
     .select(`
       *,
@@ -14,18 +14,18 @@ export async function getEvents(): Promise<EventWithDetails[]> {
     `)
     .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching events:', error)
+  if (fetchError) {
+    console.error('Error fetching events:', fetchError)
     throw new Error('Failed to fetch events')
   }
 
-  return (data || []) as EventWithDetails[]
+  return (eventsData || []) as EventWithDetails[]
 }
 
 export async function getEventById(eventId: string): Promise<EventWithDetails | null> {
   const supabase = await createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data: eventData, error: fetchError } = await supabase
     .from('events')
     .select(`
       *,
@@ -36,27 +36,27 @@ export async function getEventById(eventId: string): Promise<EventWithDetails | 
     .eq('id', eventId)
     .single()
 
-  if (error) {
-    console.error('Error fetching event:', error)
+  if (fetchError) {
+    console.error('Error fetching event:', fetchError)
     return null
   }
 
-  if (!data) {
+  if (!eventData) {
     return null
   }
 
-  return data as EventWithDetails
+  return eventData as EventWithDetails
 }
 
 export async function getEventCount(): Promise<number> {
   const supabase = await createServerSupabaseClient()
 
-  const { count, error } = await supabase
+  const { count, error: countError } = await supabase
     .from('events')
     .select('id', { count: 'exact', head: true })
 
-  if (error) {
-    console.error('Error counting events:', error)
+  if (countError) {
+    console.error('Error counting events:', countError)
     return 0
   }
 
@@ -66,17 +66,17 @@ export async function getEventCount(): Promise<number> {
 export async function getActiveEvents(): Promise<Event[]> {
   const supabase = await createServerSupabaseClient()
 
-  const { data, error } = await supabase
+  const { data: eventsData, error: fetchError } = await supabase
     .from('events')
     .select('*')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching active events:', error)
+  if (fetchError) {
+    console.error('Error fetching active events:', fetchError)
     throw new Error('Failed to fetch events')
   }
 
-  return (data || []) as Event[]
+  return (eventsData || []) as Event[]
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/lib/zustand-selectors'
+import { useAuth } from '@/hooks/useAuth'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import AdminLayout from '@/components/global/AdminLayout'
 import { Typography, Box, Paper, Grid, Card, CardContent } from '@mui/material'

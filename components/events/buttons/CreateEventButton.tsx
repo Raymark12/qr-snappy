@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@mui/material'
 import { Add as AddIcon } from '@mui/icons-material'
 import CreateEventDialog from '@/components/events/dialogs/CreateEventDialog'
-import { useAuth } from '@/lib/zustand-selectors'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function CreateEventButton() {
   const { isAdmin } = useAuth()

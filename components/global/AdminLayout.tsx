@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Box, Toolbar, useMediaQuery, useTheme } from '@mui/material'
 import { usePathname } from 'next/navigation'
-import { useAuth } from '@/lib/zustand-selectors'
+import { useAuth } from '@/hooks/useAuth'
 import AdminHeader from './AdminHeader'
 import AdminSidebar, { menuItems } from './AdminSidebar'
 
