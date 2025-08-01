@@ -1,7 +1,7 @@
 'use client'
 
-import { Component, ReactNode, ErrorInfo } from 'react'
-import { Box, Button, Container, Typography } from '@mui/material'
+import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { Box, Typography, Button, Paper } from '@mui/material'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 
 interface Props {
@@ -14,7 +14,7 @@ interface State {
   error?: Error
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+export default class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props)
     this.state = { hasError: false }
@@ -25,7 +25,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo)
+    console.error('ErrorBoundary caught an error:', error, errorInfo)
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: undefined })
   }
 
   render() {
@@ -35,30 +39,34 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <Container maxWidth="sm">
-          <Box
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '400px',
+            p: 3,
+          }}
+        >
+          <Paper
             sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: '100vh',
+              p: 4,
+              maxWidth: 600,
               textAlign: 'center',
-              gap: 2,
             }}
           >
-            <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main' }} />
-            <Typography variant="h4" component="h1" gutterBottom>
+            <ErrorOutlineIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
+            <Typography variant="h5" gutterBottom>
               Something went wrong
             </Typography>
-            <Typography variant="body1" color="text.secondary" gutterBottom>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
               {this.state.error?.message || 'An unexpected error occurred'}
             </Typography>
-            <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
-              Reload Page
+            <Button variant="contained" onClick={this.handleReset}>
+              Try Again
             </Button>
-          </Box>
-        </Container>
+          </Paper>
+        </Box>
       )
     }
 
