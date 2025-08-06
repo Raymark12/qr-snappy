@@ -4,7 +4,22 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
   NEXT_PUBLIC_APP_URL: z.string().url().optional().default('http://localhost:3000'),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .min(1, 'SUPABASE_SERVICE_ROLE_KEY is required')
+    .optional()
+    .refine(
+      (val) => {
+        const nodeEnv = process.env.NODE_ENV || 'development'
+        if (nodeEnv === 'production') {
+          return !!val && val.length > 0
+        }
+        return true
+      },
+      {
+        message: 'SUPABASE_SERVICE_ROLE_KEY is required in production for admin operations',
+      }
+    ),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

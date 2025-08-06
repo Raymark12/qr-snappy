@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { verifyPassword } from '@/lib/utils/password-server'
-import { z } from 'zod'
-
-// Request validation schema
-const verifyPasswordSchema = z.object({
-  eventId: z.string().uuid('Invalid event ID'),
-  password: z.string().min(1, 'Password is required'),
-})
+import { verifyPasswordSchema } from '@/lib/validations'
 
 /**
  * POST /api/events/verify-password
@@ -28,8 +22,8 @@ export async function POST(request: NextRequest) {
     const { eventId, password } = validationResult.data
 
     // Get event from database
-    const supabase = await createServerSupabaseClient()
-    const { data: event, error } = await supabase
+    const supabase = createRouteSupabaseClient(request)
+    const { data: eventData, error: fetchError } = await supabase
       .from('events')
       .select('id, password, is_active')
       .eq('id', eventId)
@@ -39,23 +33,23 @@ export async function POST(request: NextRequest) {
         is_active: boolean
       }>()
 
-    if (error || !event) {
+    if (fetchError || !eventData) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    if (!event.is_active) {
+    if (!eventData.is_active) {
       return NextResponse.json({ error: 'Event is not active' }, { status: 403 })
     }
 
-    const isValid = await verifyPassword(password, event.password)
+    const isPasswordValid = await verifyPassword(password, eventData.password)
 
-    if (!isValid) {
+    if (!isPasswordValid) {
       return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
     }
 
     return NextResponse.json({
       success: true,
-      eventId: event.id,
+      eventId: eventData.id,
     })
   } catch (error) {
     console.error('Password verification error:', error)
