@@ -10,6 +10,10 @@ const envSchema = z.object({
     .optional()
     .refine(
       (val) => {
+        // Do not enforce in the browser – server-only secret
+        if (typeof window !== 'undefined') {
+          return true
+        }
         const nodeEnv = process.env.NODE_ENV || 'development'
         if (nodeEnv === 'production') {
           return !!val && val.length > 0
