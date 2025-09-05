@@ -86,6 +86,44 @@ export async function requireAdmin(
 }
 
 /**
+ * Require user to be an event moderator (admin or assigned client)
+ * @param supabase - Supabase client instance
+ * @param eventId - Event ID to check moderation access for
+ * @returns AuthResult with user if moderator, AuthError otherwise
+ */
+export async function requireEventModerator(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any>,
+  eventId: string
+): Promise<AuthResult | AuthError> {
+  const authResult = await requireAuth(supabase)
+
+  if ('error' in authResult) {
+    return authResult
+  }
+
+  const { user } = authResult
+
+  if (user.role === 'admin') {
+    return authResult
+  }
+
+  if (user.role === 'client') {
+    const hasAccess = await hasEventAccess(supabase, eventId, user)
+    if (hasAccess) {
+      return authResult
+    }
+  }
+
+  return {
+    error: NextResponse.json(
+      { error: 'Forbidden - Event moderator access required' },
+      { status: 403 }
+    ),
+  }
+}
+
+/**
  * Check if user has access to an event (either admin or assigned client)
  * @param supabase - Supabase client instance
  * @param eventId - Event ID to check access for

@@ -46,9 +46,21 @@ export function sanitizeFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_')
 }
 
+export function getFileExtension(filename: string): string {
+  const lastDot = filename.lastIndexOf('.')
+  if (lastDot === -1 || lastDot === filename.length - 1) {
+    return ''
+  }
+  return filename.substring(lastDot).toLowerCase()
+}
+
+/**
+ * Generate a fully random filename for storage
+ * Original filename is stored in database only, not in storage path
+ */
 export function getPhotoStoragePath(eventId: string, filename: string): string {
-  const safeName = sanitizeFilename(filename)
-  const objectName = `${crypto.randomUUID()}-${safeName}`
+  const extension = getFileExtension(filename)
+  const objectName = `${crypto.randomUUID()}${extension}`
   return `${STORAGE.BUCKET_NAME}/${eventId}/${objectName}`
 }
 

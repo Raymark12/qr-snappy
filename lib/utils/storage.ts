@@ -3,25 +3,27 @@ import { env } from '@/lib/env'
 import { STORAGE } from '@/lib/constants'
 import { parseStoragePath } from './file-validation'
 
-/**
- * Get authenticated/signed URL for storage objects
- * Works with private buckets using RLS policies
- */
 export async function getAuthenticatedImageUrl(filePath: string): Promise<string> {
+  if (!filePath || filePath.trim() === '') {
+    throw new Error('Invalid file path')
+  }
+
   const supabase = createSupabaseClient()
+
+  let pathInBucket = filePath
+  if (filePath.startsWith(`${STORAGE.BUCKET_NAME}/`)) {
+    pathInBucket = filePath.replace(`${STORAGE.BUCKET_NAME}/`, '')
+  }
 
   // Get signed URL that includes auth credentials
   const { data, error } = await supabase.storage
     .from(STORAGE.BUCKET_NAME)
-    .createSignedUrl(
-      filePath.replace(`${STORAGE.BUCKET_NAME}/`, ''),
-      STORAGE.SIGNED_URL_EXPIRY
-    )
+    .createSignedUrl(pathInBucket, STORAGE.SIGNED_URL_EXPIRY)
 
   if (error || !data) {
-    console.error('Failed to create signed URL:', error)
-    // Fallback to public URL (will fail if bucket is private)
-    return `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${filePath}`
+    console.error('Failed to create signed URL:', error, 'for path:', pathInBucket)
+    const fullPath = filePath.startsWith(STORAGE.BUCKET_NAME) ? filePath : `${STORAGE.BUCKET_NAME}/${filePath}`
+    return `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${fullPath}`
   }
 
   return data.signedUrl
