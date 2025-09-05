@@ -129,7 +129,7 @@ export interface Database {
           file_name: string
           author: string | null
           comment: string | null
-          status: 'pending' | 'approved' | 'rejected'
+          status: 'pending' | 'approved'
           uploaded_at: string
           reviewed_at: string | null
           reviewed_by: string | null

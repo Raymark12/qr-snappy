@@ -1,6 +1,13 @@
 -- QR Snappy Database Schema
 -- Run this SQL in your Supabase SQL Editor
-
+--
+-- This file contains the complete database schema including:
+-- - Tables (profiles, events, event_assignments, photos)
+-- - Row Level Security (RLS) policies
+-- - Storage bucket policies
+-- - Triggers and functions
+-- - Indexes for performance
+--
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -20,6 +27,7 @@ CREATE TABLE IF NOT EXISTS events (
   password TEXT NOT NULL,
   admin_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   is_active BOOLEAN DEFAULT true,
+  background_image_path TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -43,7 +51,7 @@ CREATE TABLE IF NOT EXISTS photos (
   file_name TEXT NOT NULL,
   author TEXT,
   comment TEXT,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved')),
   uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   reviewed_at TIMESTAMP WITH TIME ZONE,
   reviewed_by UUID REFERENCES profiles(id)
@@ -202,6 +210,18 @@ CREATE POLICY "Event admins can view all photos for their events" ON photos
     )
   );
 
+-- Assigned clients can view all photos (pending and approved) for their assigned events
+CREATE POLICY "Assigned clients can view all photos for their events" ON photos
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM event_assignments ea
+      JOIN profiles p ON p.id = auth.uid()
+      WHERE ea.event_id = photos.event_id 
+      AND ea.client_id = auth.uid()
+      AND p.role = 'client'
+    )
+  );
+
 CREATE POLICY "Anyone can insert photos to active events" ON photos
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -222,6 +242,18 @@ CREATE POLICY "Event admins can update photo status" ON photos
     )
   );
 
+-- Assigned clients can update photo status for their assigned events
+CREATE POLICY "Assigned clients can update photo status" ON photos
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM event_assignments ea
+      JOIN profiles p ON p.id = auth.uid()
+      WHERE ea.event_id = photos.event_id 
+      AND ea.client_id = auth.uid()
+      AND p.role = 'client'
+    )
+  );
+
 CREATE POLICY "Event admins can delete photos from their events" ON photos
   FOR DELETE USING (
     EXISTS (
@@ -230,6 +262,18 @@ CREATE POLICY "Event admins can delete photos from their events" ON photos
       WHERE e.id = photos.event_id 
       AND e.admin_id = auth.uid()
       AND p.role = 'admin'
+    )
+  );
+
+-- Assigned clients can delete photos from their assigned events
+CREATE POLICY "Assigned clients can delete photos from their events" ON photos
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM event_assignments ea
+      JOIN profiles p ON p.id = auth.uid()
+      WHERE ea.event_id = photos.event_id 
+      AND ea.client_id = auth.uid()
+      AND p.role = 'client'
     )
   );
 
@@ -247,13 +291,16 @@ CREATE INDEX IF NOT EXISTS idx_photos_uploaded_at ON photos(uploaded_at);
 
 -- Function to automatically create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, role)
   VALUES (NEW.id, NEW.email, 'user');
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 -- Trigger to create profile on user signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -263,7 +310,9 @@ CREATE TRIGGER on_auth_user_created
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = public
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
@@ -276,6 +325,18 @@ CREATE TRIGGER handle_events_updated_at
   BEFORE UPDATE ON events
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+-- ============================================================================
+-- STORAGE BUCKETS SETUP
+-- ============================================================================
+-- Note: You need to create storage buckets manually in Supabase Dashboard:
+-- 1. Go to Storage > Create Bucket
+-- 2. Create bucket named "Photos" (public or private as needed)
+--    - This bucket stores:
+--      * Photos: Photos/{eventId}/{filename}
+--      * QR Codes: Photos/qr/{eventId}/event-qr.png
+--      * Background Images: Photos/backgrounds/{eventId}/background.jpg
+--
+-- The following policies will apply once the bucket is created.
 
 -- 2. Allow authenticated users to upload photos
 CREATE POLICY "Allow authenticated uploads to Photos bucket"
@@ -319,14 +380,28 @@ USING (
   )
 );
 
--- 4. Only admins can delete photos
-CREATE POLICY "Only admins can delete from Photos bucket"
+-- 4. Admins and assigned clients can delete photos
+CREATE POLICY "Admins can delete from Photos bucket"
 ON storage.objects
 FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'Photos'
   AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+);
+
+CREATE POLICY "Assigned clients can delete from Photos bucket"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'Photos'
+  AND EXISTS (
+    SELECT 1 
+    FROM public.event_assignments 
+    WHERE client_id = auth.uid() 
+    AND event_id = (storage.foldername(name))[1]::uuid
+  )
 );
 
 -- Performance indexes
@@ -340,8 +415,8 @@ ON photos(status, uploaded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_photos_user_email 
 ON photos(user_email) WHERE user_email IS NOT NULL;
 
--- 5. Only admins can update/move photos
-CREATE POLICY "Only admins can update Photos bucket"
+-- 5. Admins and assigned clients can update/move photos
+CREATE POLICY "Admins can update Photos bucket"
 ON storage.objects
 FOR UPDATE
 TO authenticated
@@ -352,4 +427,27 @@ USING (
 WITH CHECK (
   bucket_id = 'Photos'
   AND (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
+);
+
+CREATE POLICY "Assigned clients can update Photos bucket"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'Photos'
+  AND EXISTS (
+    SELECT 1 
+    FROM public.event_assignments 
+    WHERE client_id = auth.uid() 
+    AND event_id = (storage.foldername(name))[1]::uuid
+  )
+)
+WITH CHECK (
+  bucket_id = 'Photos'
+  AND EXISTS (
+    SELECT 1 
+    FROM public.event_assignments 
+    WHERE client_id = auth.uid() 
+    AND event_id = (storage.foldername(name))[1]::uuid
+  )
 );
