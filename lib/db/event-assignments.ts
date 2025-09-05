@@ -1,21 +1,28 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-export interface EventAssignment {
-  id: string
-  event_id: string
-  client_id: string
-  assigned_at: string
-  assigned_by: string | null
-}
 
-export async function assignEventToUser(eventId: string, userId: string): Promise<boolean> {
+export async function assignEventToUser(eventId: string, userId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createServerSupabaseClient()
 
   const {
     data: { user: currentUser },
   } = await supabase.auth.getUser()
 
-  if (!currentUser) return false
+  if (!currentUser) {
+    return { success: false, error: 'User not authenticated' }
+  }
+
+  // Check if assignment already exists
+  const { data: existingAssignment } = await supabase
+    .from('event_assignments')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('client_id', userId)
+    .maybeSingle()
+
+  if (existingAssignment) {
+    return { success: false, error: 'Event is already assigned to this user' }
+  }
 
   const { error: insertError } = await supabase
     .from('event_assignments')
@@ -26,7 +33,15 @@ export async function assignEventToUser(eventId: string, userId: string): Promis
       assigned_by: currentUser.id,
     })
 
-  return !insertError
+  if (insertError) {
+    // Check for unique constraint violation
+    if (insertError.code === '23505') {
+      return { success: false, error: 'Event is already assigned to this user' }
+    }
+    return { success: false, error: insertError.message || 'Failed to assign event' }
+  }
+
+  return { success: true }
 }
 
 export async function removeEventAssignment(eventId: string, userId: string): Promise<boolean> {
@@ -39,58 +54,6 @@ export async function removeEventAssignment(eventId: string, userId: string): Pr
     .eq('client_id', userId)
 
   return !deleteError
-}
-
-export async function getEventAssignments(eventId: string) {
-  const supabase = await createServerSupabaseClient()
-
-  const { data: assignmentsData, error: fetchError } = await supabase
-    .from('event_assignments')
-    .select(
-      `
-      *,
-      profiles!event_assignments_client_id_fkey (
-        id,
-        email,
-        role
-      )
-    `
-    )
-    .eq('event_id', eventId)
-
-  if (fetchError) {
-    console.error('Error fetching event assignments:', fetchError)
-    return []
-  }
-
-  return assignmentsData || []
-}
-
-export async function getUserAssignedEvents(userId: string) {
-  const supabase = await createServerSupabaseClient()
-
-  const { data: eventsData, error: fetchError } = await supabase
-    .from('event_assignments')
-    .select(
-      `
-      *,
-      events (
-        id,
-        title,
-        description,
-        is_active,
-        created_at
-      )
-    `
-    )
-    .eq('client_id', userId)
-
-  if (fetchError) {
-    console.error('Error fetching user assigned events:', fetchError)
-    return []
-  }
-
-  return eventsData || []
 }
 
 export async function isUserAssignedToEvent(eventId: string, userId: string): Promise<boolean> {

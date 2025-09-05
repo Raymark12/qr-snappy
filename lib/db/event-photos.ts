@@ -8,13 +8,13 @@ export type InsertPhotoParams = {
   fileName: string
   author?: string | null
   comment?: string | null
-  status?: 'pending' | 'approved' | 'rejected'
+  status?: 'pending' | 'approved'
 }
 
-export async function getEventPhotos(eventId: string, includePendingForAdmin = false): Promise<Photo[]> {
+export async function getEventPhotos(eventId: string, includePendingForModerator = false): Promise<Photo[]> {
   const supabase = await createServerSupabaseClient()
 
-  let isUserAdmin = false
+  let isModerator = false
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -25,7 +25,23 @@ export async function getEventPhotos(eventId: string, includePendingForAdmin = f
       .select('role')
       .eq('id', user.id)
       .single<{ role: 'admin' | 'user' | 'client' }>()
-    isUserAdmin = profileData?.role === 'admin'
+
+    const userRole = profileData?.role
+
+    if (userRole === 'admin') {
+      isModerator = true
+    }
+    else if (userRole === 'client') {
+      // Check if client is assigned to this event
+      const { data: assignment } = await supabase
+        .from('event_assignments')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('client_id', user.id)
+        .maybeSingle()
+
+      isModerator = !!assignment
+    }
   }
 
   const query = supabase
@@ -34,7 +50,7 @@ export async function getEventPhotos(eventId: string, includePendingForAdmin = f
     .eq('event_id', eventId)
     .order('uploaded_at', { ascending: false })
 
-  if (!includePendingForAdmin || !isUserAdmin) {
+  if (!includePendingForModerator || !isModerator) {
     query.eq('status', 'approved')
   }
 
@@ -72,6 +88,69 @@ export async function insertPhotoRow(params: InsertPhotoParams): Promise<{ succe
   }
 
   return { success: true, id: photoData?.id }
+}
+
+export async function updatePhotoStatus(
+  photoId: string,
+  status: 'approved',
+  reviewedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+
+  const { error } = await supabase
+    .from('photos')
+    // @ts-expect-error - Supabase types complexity
+    .update({
+      status,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: reviewedBy,
+    })
+    .eq('id', photoId)
+
+  if (error) {
+    console.error('Error updating photo status:', error)
+    return { success: false, error: 'Failed to update photo status' }
+  }
+
+  return { success: true }
+}
+
+export async function getPhotoById(photoId: string): Promise<Photo | null> {
+  const supabase = await createServerSupabaseClient()
+
+  const { data, error } = await supabase
+    .from('photos')
+    .select('*')
+    .eq('id', photoId)
+    .single<Photo>()
+
+  if (error) {
+    console.error('Error fetching photo:', error)
+    return null
+  }
+
+  return data || null
+}
+
+export async function deletePhoto(photoId: string): Promise<{ success: boolean; filePath?: string; error?: string }> {
+  const supabase = await createServerSupabaseClient()
+
+  const photo = await getPhotoById(photoId)
+  if (!photo) {
+    return { success: false, error: 'Photo not found' }
+  }
+
+  const { error } = await supabase
+    .from('photos')
+    .delete()
+    .eq('id', photoId)
+
+  if (error) {
+    console.error('Error deleting photo:', error)
+    return { success: false, error: 'Failed to delete photo' }
+  }
+
+  return { success: true, filePath: photo.file_path }
 }
 
 
