@@ -1,4 +1,8 @@
+
+
+
 import { createWithEqualityFn } from 'zustand/traditional'
+
 import { persist } from 'zustand/middleware'
 import { createSupabaseClient } from '@/lib/supabase/client'
 import type { AuthUser, UserRole } from '@/types'
@@ -7,16 +11,20 @@ interface AuthState {
   user: AuthUser | null
   isLoading: boolean
 
-  // Actions
+
   setUser: (user: AuthUser | null) => void
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   initialize: () => Promise<void>
 }
 
+
 export const useAuthStore = createWithEqualityFn<AuthState>()(
+
   persist(
+
     (set, get) => ({
+
       user: null,
       isLoading: true,
 
@@ -44,6 +52,7 @@ export const useAuthStore = createWithEqualityFn<AuthState>()(
 
           if (data.user) {
             // Fetch user profile to get role
+            // Obtiene el perfil del usuario de la base de datos para obtener el rol
             const { data: profile, error: profileError } = await supabase
               .from('profiles')
               .select('role')
