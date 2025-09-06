@@ -43,6 +43,11 @@ export const QUERY = {
   PHOTOS_REFETCH_INTERVAL: 60 * 1000,
 } as const
 
+export const PASSWORD_CACHE = {
+  /** Password cache expiry in hours */
+  EXPIRY_HOURS: 24,
+} as const
+
 export const UI = {
   /** Toast auto-hide duration for success messages (ms) */
   TOAST_SUCCESS_DURATION: 4000,
@@ -52,4 +57,13 @@ export const UI = {
   UPLOAD_SUCCESS_CLEANUP_DELAY: 500,
   /** Upload cleanup delay after error (ms) */
   UPLOAD_ERROR_CLEANUP_DELAY: 3000,
+} as const
+
+export const TOAST_MESSAGES = {
+  PHOTO_APPROVED: 'Photo approved successfully',
+  PHOTO_APPROVED_ERROR: 'Failed to approve photo. Please try again.',
+  PHOTO_REJECTED: 'Photo rejected and deleted',
+  PHOTO_REJECTED_ERROR: 'Failed to reject photo. Please try again.',
+  PHOTO_DELETED: 'Photo deleted successfully',
+  PHOTO_DELETED_ERROR: 'Failed to delete photo. Please try again.',
 } as const
