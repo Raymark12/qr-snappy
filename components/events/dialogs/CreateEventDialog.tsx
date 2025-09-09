@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -11,7 +11,9 @@ import {
   Box,
   Alert,
   CircularProgress,
+  Typography,
 } from '@mui/material'
+import { Image as ImageIcon } from '@mui/icons-material'
 import { createEvent } from '@/lib/actions/events'
 import { useRouter } from 'next/navigation'
 
@@ -24,6 +26,16 @@ export default function CreateEventDialog({ open, onClose }: CreateEventDialogPr
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
+  const [backgroundImage, setBackgroundImage] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setBackgroundImage(file)
+    }
+    e.currentTarget.value = ''
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -34,9 +46,26 @@ export default function CreateEventDialog({ open, onClose }: CreateEventDialogPr
     startTransition(async () => {
       const result = await createEvent(formData)
 
-      if (result.success) {
+      if (result.success && result.data?.id) {
+        if (backgroundImage) {
+          try {
+            const bgFormData = new FormData()
+            bgFormData.append('image', backgroundImage)
+            const bgRes = await fetch(`/api/events/${result.data.id}/background`, {
+              method: 'POST',
+              body: bgFormData,
+            })
+            if (!bgRes.ok) {
+              console.error('Failed to upload background image')
+            }
+          } catch (err) {
+            console.error('Error uploading background image:', err)
+          }
+        }
+
         onClose()
         ;(e.target as HTMLFormElement).reset()
+        setBackgroundImage(null)
         router.refresh()
       } else {
         setError(result.error || 'Failed to create event')
@@ -79,6 +108,30 @@ export default function CreateEventDialog({ open, onClose }: CreateEventDialogPr
               placeholder="Min 4 characters"
               disabled={isPending}
             />
+            <Box>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageSelect}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<ImageIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isPending}
+                sx={{ textTransform: 'none', mb: 1 }}
+                fullWidth
+              >
+                {backgroundImage ? 'Change Background Image' : 'Select Background Image (Optional)'}
+              </Button>
+              {backgroundImage && (
+                <Typography variant="body2" color="text.secondary">
+                  Selected: {backgroundImage.name}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

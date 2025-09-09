@@ -16,6 +16,7 @@ import {
 import { Lock as LockIcon } from '@mui/icons-material'
 import type { Event } from '@/types'
 import { useRouter } from 'next/navigation'
+import { apiPost } from '@/lib/utils/api-client'
 
 interface EventPasswordDialogProps {
   open: boolean
@@ -28,6 +29,7 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
+  // no-op
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,16 +42,13 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
 
     startTransition(async () => {
       try {
-        const response = await fetch('/api/events/verify-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const data = await apiPost<{ success: boolean; error?: string }>(
+          '/api/events/verify-password',
+          {
             eventId: event.id,
             password: password,
-          }),
-        })
-
-        const data = await response.json()
+          }
+        )
 
         if (data.success) {
           router.push(`/events/${event.id}/photos`)
@@ -57,8 +56,8 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
           setError(data.error || 'Invalid password')
           setPassword('')
         }
-      } catch {
-        setError('An error occurred. Please try again.')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred. Please try again.')
       }
     })
   }
@@ -105,7 +104,7 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
           type="password"
           fullWidth
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={e => setPassword(e.target.value)}
           disabled={isPending}
           error={!!error}
           helperText={error || 'Enter the password to access this event'}
