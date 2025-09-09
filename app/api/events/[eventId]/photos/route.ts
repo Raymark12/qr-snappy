@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ eventId
       )
     }
 
-    const photos = await getEventPhotos(eventId, true)
+    const photos = await getEventPhotos(eventId, true) // includePendingForModerator = true
 
     return NextResponse.json(photos)
   } catch (err) {
