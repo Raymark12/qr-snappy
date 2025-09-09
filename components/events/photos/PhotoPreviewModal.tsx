@@ -92,7 +92,7 @@ export default function PhotoPreviewModal({
       </DialogTitle>
 
       <DialogContent dividers>
-        <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+        <Box sx={{ mb: 3, p: 2, borderRadius: 1 }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
             Quick Fill: Author Name
           </Typography>
@@ -167,19 +167,6 @@ export default function PhotoPreviewModal({
                   />
                 </Box>
                 <CardContent sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: 'block',
-                      mb: 1.5,
-                      fontWeight: 500,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {photo.file.name}
-                  </Typography>
                   <TextField
                     size="small"
                     label="Author (optional)"

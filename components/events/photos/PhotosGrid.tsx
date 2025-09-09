@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Box, Typography } from '@mui/material'
 import type { Photo } from '@/types'
 import PhotoItem from './PhotoItem'
@@ -9,11 +9,25 @@ import { getAuthenticatedImageUrl } from '@/lib/utils/storage'
 
 interface PhotosGridProps {
   photos: Photo[]
+  eventId: string
 }
 
-export default function PhotosGrid({ photos }: PhotosGridProps) {
+export default function PhotosGrid({ photos, eventId }: PhotosGridProps) {
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+
+  useEffect(() => {
+    if (photos.length === 0) {
+      if (galleryOpen) {
+        setGalleryOpen(false)
+      }
+      setSelectedIndex(0)
+    } else if (galleryOpen && selectedIndex >= photos.length) {
+      setGalleryOpen(false)
+      setSelectedIndex(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photos.length])
 
   if (!photos.length) {
     return (
@@ -29,8 +43,10 @@ export default function PhotosGrid({ photos }: PhotosGridProps) {
   }
 
   const handlePhotoClick = (index: number) => {
-    setSelectedIndex(index)
-    setGalleryOpen(true)
+    if (index >= 0 && index < photos.length && photos[index]?.file_path) {
+      setSelectedIndex(index)
+      setGalleryOpen(true)
+    }
   }
 
   return (
@@ -49,7 +65,17 @@ export default function PhotosGrid({ photos }: PhotosGridProps) {
         }}
       >
         {photos.map((photo, index) => (
-          <PhotoItem key={photo.id} photo={photo} onClick={() => handlePhotoClick(index)} />
+          <PhotoItem
+            key={photo.id}
+            photo={photo}
+            eventId={eventId}
+            priority={index === 0}
+            onClick={() => {
+              if (photo.file_path && photo.file_path !== '') {
+                handlePhotoClick(index)
+              }
+            }}
+          />
         ))}
       </Box>
 

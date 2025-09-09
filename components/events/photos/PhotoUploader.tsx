@@ -1,10 +1,11 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { Box, Button, Typography, Snackbar, Alert, LinearProgress } from '@mui/material'
+import { Box, Button, Typography, LinearProgress } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import { useUploadPhoto } from '@/hooks/usePhotos'
 import { FILE_UPLOAD, UI } from '@/lib/constants'
+import { useToastStore } from '@/stores/toastStore'
 import PhotoPreviewModal, { type PhotoPreviewItem } from './PhotoPreviewModal'
 
 type UploadItem = {
@@ -12,12 +13,6 @@ type UploadItem = {
   file: File
   status: 'uploading' | 'success' | 'error'
   error?: string
-}
-
-type ToastMessage = {
-  id: string
-  message: string
-  severity: 'success' | 'error' | 'info' | 'warning'
 }
 
 interface PhotoUploaderProps {
@@ -29,15 +24,15 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
   const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set())
   const [uploads, setUploads] = useState<UploadItem[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [toasts, setToasts] = useState<ToastMessage[]>([])
   const [previewPhotos, setPreviewPhotos] = useState<PhotoPreviewItem[]>([])
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(
     null
   )
   const uploadMutation = useUploadPhoto(eventId)
+  const showToast = useToastStore(state => state.showToast)
 
-  // Cleanup timeouts on unmount
+  // Cleanup timeouts on unmount to prevent memory leaks
   useEffect(() => {
     const timeouts = timeoutRefs.current
     return () => {
@@ -45,15 +40,6 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
       timeouts.clear()
     }
   }, [])
-
-  const showToast = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    setToasts((prev) => [...prev, { id, message, severity }])
-  }
-
-  const hideToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }
 
   const scheduleTimeout = (callback: () => void, delay: number) => {
     const timeoutId = setTimeout(() => {
@@ -64,10 +50,15 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
     return timeoutId
   }
 
-  const handleUpload = async (file: File, author?: string, comment?: string) => {
+  const handleUpload = async (
+    file: File,
+    author?: string,
+    comment?: string,
+    suppressToast = false
+  ) => {
     const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-    setUploads((prev) => [
+    setUploads(prev => [
       {
         id: uploadId,
         file,
@@ -79,18 +70,21 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
     try {
       await uploadMutation.mutateAsync({ file, author, comment })
 
-      setUploads((prev) =>
-        prev.map((u) => (u.id === uploadId ? { ...u, status: 'success' as const } : u))
+      setUploads(prev =>
+        prev.map(u => (u.id === uploadId ? { ...u, status: 'success' as const } : u))
       )
 
-      showToast(`${file.name} uploaded successfully`, 'success')
+      // Only show individual toast for single file uploads
+      if (!suppressToast) {
+        showToast(`${file.name} uploaded successfully`, 'success')
+      }
 
       scheduleTimeout(() => {
-        setUploads((prev) => prev.filter((u) => u.id !== uploadId))
+        setUploads(prev => prev.filter(u => u.id !== uploadId))
       }, UI.UPLOAD_SUCCESS_CLEANUP_DELAY)
     } catch (error) {
-      setUploads((prev) =>
-        prev.map((u) =>
+      setUploads(prev =>
+        prev.map(u =>
           u.id === uploadId
             ? {
                 ...u,
@@ -101,11 +95,14 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
         )
       )
 
-      const errorMsg = error instanceof Error ? error.message : 'Upload failed'
-      showToast(`Failed to upload ${file.name}: ${errorMsg}`, 'error')
+      // Only show individual toast for single file uploads
+      if (!suppressToast) {
+        const errorMsg = error instanceof Error ? error.message : 'Upload failed'
+        showToast(`Failed to upload ${file.name}: ${errorMsg}`, 'error')
+      }
 
       scheduleTimeout(() => {
-        setUploads((prev) => prev.filter((u) => u.id !== uploadId))
+        setUploads(prev => prev.filter(u => u.id !== uploadId))
       }, UI.UPLOAD_ERROR_CLEANUP_DELAY)
     }
   }
@@ -123,7 +120,7 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
 
     const fileArray = Array.from(files)
 
-    const newPreviews: PhotoPreviewItem[] = fileArray.map((file) => ({
+    const newPreviews: PhotoPreviewItem[] = fileArray.map(file => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       file,
       preview: URL.createObjectURL(file),
@@ -136,7 +133,7 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
   }
 
   const handlePreviewClose = () => {
-    previewPhotos.forEach((p) => URL.revokeObjectURL(p.preview))
+    previewPhotos.forEach(p => URL.revokeObjectURL(p.preview))
     setPreviewPhotos([])
     setPreviewModalOpen(false)
   }
@@ -155,9 +152,14 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
 
     for (let i = 0; i < photos.length; i += concurrencyLimit) {
       const batch = photos.slice(i, i + concurrencyLimit)
-      const batchPromises = batch.map(async (photo) => {
+      const batchPromises = batch.map(async photo => {
         try {
-          await handleUpload(photo.file, photo.author || undefined, photo.comment || undefined)
+          await handleUpload(
+            photo.file,
+            photo.author || undefined,
+            photo.comment || undefined,
+            photos.length > 1
+          )
           return { success: true, filename: photo.file.name }
         } catch {
           return { success: false, filename: photo.file.name }
@@ -165,7 +167,7 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
       })
 
       const batchResults = await Promise.allSettled(batchPromises)
-      batchResults.forEach((result) => {
+      batchResults.forEach(result => {
         if (result.status === 'fulfilled') {
           results.push(result.value)
         }
@@ -176,34 +178,36 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
 
     setUploadProgress(null)
 
-    const successCount = results.filter((r) => r.success).length
+    const successCount = results.filter(r => r.success).length
     const failCount = results.length - successCount
 
-    if (failCount > 0) {
-      showToast(`${successCount} uploaded, ${failCount} failed`, 'warning')
-    } else if (photos.length > 1) {
-      showToast(`All ${successCount} photos uploaded successfully`, 'success')
+    if (photos.length > 1) {
+      if (failCount > 0) {
+        showToast(`${successCount} uploaded, ${failCount} failed`, 'warning')
+      } else {
+        showToast(`All ${successCount} photos uploaded successfully`, 'success')
+      }
     }
 
-    photos.forEach((p) => URL.revokeObjectURL(p.preview))
+    photos.forEach(p => URL.revokeObjectURL(p.preview))
     setPreviewPhotos([])
   }
 
   const handleUpdatePhoto = (id: string, updates: Partial<PhotoPreviewItem>) => {
-    setPreviewPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)))
+    setPreviewPhotos(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)))
   }
 
   const handleRemovePhoto = (id: string) => {
-    setPreviewPhotos((prev) => {
-      const photo = prev.find((p) => p.id === id)
+    setPreviewPhotos(prev => {
+      const photo = prev.find(p => p.id === id)
       if (photo) {
         URL.revokeObjectURL(photo.preview)
       }
-      return prev.filter((p) => p.id !== id)
+      return prev.filter(p => p.id !== id)
     })
   }
 
-  const activeUploads = uploads.filter((u) => u.status === 'uploading')
+  const activeUploads = uploads.filter(u => u.status === 'uploading')
 
   return (
     <>
@@ -218,12 +222,12 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
 
       <Box sx={{ p: 0 }}>
         <Box
-          onDragOver={(e) => {
+          onDragOver={e => {
             e.preventDefault()
             setIsDragging(true)
           }}
           onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
+          onDrop={e => {
             e.preventDefault()
             setIsDragging(false)
             onFilesSelected(e.dataTransfer.files)
@@ -251,7 +255,7 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
             accept="image/*"
             multiple
             hidden
-            onChange={(e) => onFilesSelected(e.target.files)}
+            onChange={e => onFilesSelected(e.target.files)}
           />
           <Button
             variant="contained"
@@ -286,28 +290,6 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
           )}
         </Box>
       </Box>
-
-      {toasts.map((toast, index) => (
-        <Snackbar
-          key={toast.id}
-          open={true}
-          autoHideDuration={
-            toast.severity === 'error' ? UI.TOAST_ERROR_DURATION : UI.TOAST_SUCCESS_DURATION
-          }
-          onClose={() => hideToast(toast.id)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          sx={{ bottom: { xs: 80 + index * 70, sm: 24 + index * 70 } }}
-        >
-          <Alert
-            onClose={() => hideToast(toast.id)}
-            severity={toast.severity}
-            variant="filled"
-            sx={{ width: '100%' }}
-          >
-            {toast.message}
-          </Alert>
-        </Snackbar>
-      ))}
     </>
   )
 }
