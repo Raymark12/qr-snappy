@@ -12,21 +12,23 @@ import {
   Divider,
   Box,
   useTheme,
+  Breadcrumbs,
+  Link,
 } from '@mui/material'
 import {
   Menu as MenuIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   Person as PersonIcon,
+  NavigateNext as NavigateNextIcon,
 } from '@mui/icons-material'
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { logoutAction } from '@/lib/actions/auth'
 
 const DRAWER_WIDTH = 260
 
 interface AdminHeaderProps {
-  title: string
   user: {
     email?: string
     role?: string
@@ -34,12 +36,53 @@ interface AdminHeaderProps {
   onMenuClick: () => void
 }
 
-export default function AdminHeader({ title, user, onMenuClick }: AdminHeaderProps) {
+interface BreadcrumbItem {
+  label: string
+  path?: string
+}
+
+function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
+  const breadcrumbs: BreadcrumbItem[] = []
+
+  // Always start with Dashboard
+  breadcrumbs.push({ label: 'Dashboard', path: '/dashboard' })
+
+  // Parse pathname
+  const segments = pathname.split('/').filter(Boolean)
+
+  if (segments.length === 0) {
+    return breadcrumbs
+  }
+
+  if (segments[0] === 'events') {
+    breadcrumbs.push({ label: 'Events', path: '/events' })
+
+    if (segments.length > 1) {
+      if (segments.length === 2) {
+        breadcrumbs.push({ label: 'Event Details' })
+      } else if (segments.length === 3 && segments[2] === 'photos') {
+        breadcrumbs.push({ label: 'Photos' })
+      }
+    }
+  } else if (segments[0] === 'dashboard' && segments.length > 1) {
+    if (segments[1] === 'profile') {
+      breadcrumbs.push({ label: 'Profile' })
+    } else if (segments[1] === 'settings') {
+      breadcrumbs.push({ label: 'Settings' })
+    }
+  }
+
+  return breadcrumbs
+}
+
+export default function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
   const theme = useTheme()
   const router = useRouter()
+  const pathname = usePathname()
   const [isPending, startTransition] = useTransition()
 
-  // User menu state
+  const breadcrumbs = generateBreadcrumbs(pathname || '')
+
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const openUserMenu = Boolean(anchorEl)
 
@@ -77,12 +120,19 @@ export default function AdminHeader({ title, user, onMenuClick }: AdminHeaderPro
         sx={{
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           ml: { md: `${DRAWER_WIDTH}px` },
+          height: '6vh',
           bgcolor: 'background.paper',
           color: 'text.primary',
           borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Toolbar>
+        <Toolbar
+          sx={{
+            minHeight: '6vh !important',
+            height: '6vh',
+            alignItems: 'center',
+          }}
+        >
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -92,9 +142,51 @@ export default function AdminHeader({ title, user, onMenuClick }: AdminHeaderPro
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {title}
-          </Typography>
+          <Breadcrumbs
+            separator={<NavigateNextIcon fontSize="small" />}
+            aria-label="breadcrumb"
+            sx={{ flexGrow: 1 }}
+          >
+            {breadcrumbs.map((crumb, index) => {
+              const isLast = index === breadcrumbs.length - 1
+
+              if (isLast || !crumb.path) {
+                return (
+                  <Typography
+                    key={crumb.label}
+                    color="text.primary"
+                    variant="body2"
+                    sx={{ fontWeight: 600 }}
+                  >
+                    {crumb.label}
+                  </Typography>
+                )
+              }
+
+              return (
+                <Link
+                  key={crumb.label}
+                  component="button"
+                  variant="body2"
+                  color="text.secondary"
+                  onClick={() => crumb.path && router.push(crumb.path)}
+                  sx={{
+                    textDecoration: 'none',
+                    '&:hover': {
+                      textDecoration: 'underline',
+                    },
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: 'none',
+                    padding: 0,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {crumb.label}
+                </Link>
+              )
+            })}
+          </Breadcrumbs>
           <IconButton
             onClick={handleUserMenuOpen}
             size="small"

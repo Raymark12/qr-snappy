@@ -17,7 +17,6 @@ import {
   Dashboard as DashboardIcon,
   Event as EventIcon,
   QrCode as QrCodeIcon,
-  Settings as SettingsIcon,
 } from '@mui/icons-material'
 import { useRouter, usePathname } from 'next/navigation'
 
@@ -32,8 +31,6 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { label: 'Events', icon: <EventIcon />, path: '/events' },
-  { label: 'QR Codes', icon: <QrCodeIcon />, path: '/qr-codes' },
-  { label: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ]
 
 interface AdminSidebarProps {
@@ -59,6 +56,7 @@ export default function AdminSidebar({ mobileOpen, onClose, user }: AdminSidebar
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box
         sx={{
+          height: '6vh',
           p: 2.5,
           display: 'flex',
           alignItems: 'center',
@@ -85,8 +83,10 @@ export default function AdminSidebar({ mobileOpen, onClose, user }: AdminSidebar
       </Box>
 
       <List sx={{ flex: 1, pt: 2, px: 1 }}>
-        {menuItems.map((item) => {
-          const isActive = pathname === item.path
+        {menuItems.map(item => {
+          const isActive =
+            pathname === item.path ||
+            (item.path !== '/dashboard' && pathname.startsWith(item.path + '/'))
           return (
             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton

@@ -2,17 +2,15 @@
 
 import { useState } from 'react'
 import { Box, Toolbar, useMediaQuery, useTheme } from '@mui/material'
-import { usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import AdminHeader from './AdminHeader'
-import AdminSidebar, { menuItems } from './AdminSidebar'
+import AdminSidebar from './AdminSidebar'
 
 const DRAWER_WIDTH = 260
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
-  const pathname = usePathname()
   const { user } = useAuth()
 
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -27,11 +25,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
-  const pageTitle = menuItems.find((item) => item.path === pathname)?.label || 'Dashboard'
-
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AdminHeader title={pageTitle} user={user} onMenuClick={handleDrawerToggle} />
+      <AdminHeader user={user} onMenuClick={handleDrawerToggle} />
       <AdminSidebar mobileOpen={mobileOpen} onClose={handleDrawerClose} user={user} />
       <Box
         component="main"

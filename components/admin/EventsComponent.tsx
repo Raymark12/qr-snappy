@@ -32,7 +32,7 @@ export default function EventsComponent() {
           <Typography variant="h6" color="text.secondary">
             Choose an event to view and upload photos
           </Typography>
-          <Box>
+          <Box sx={{ paddingTop: 2 }}>
             <CreateEventButton />
           </Box>
         </Box>
