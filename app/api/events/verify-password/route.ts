@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { verifyPassword } from '@/lib/utils/password-server'
 import { verifyPasswordSchema } from '@/lib/validations'
+import { env } from '@/lib/env'
+import crypto from 'crypto'
+import { PASSWORD_CACHE } from '@/lib/constants'
+
+export const runtime = 'nodejs'
 
 /**
  * POST /api/events/verify-password
@@ -47,10 +52,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid password' }, { status: 401 })
     }
 
-    return NextResponse.json({
-      success: true,
-      eventId: eventData.id,
+    // Set httpOnly signed cookie to remember access for this event
+    const expiresHours = PASSWORD_CACHE.EXPIRY_HOURS
+    const exp = Math.floor(Date.now() / 1000) + expiresHours * 60 * 60
+    const payload = `${eventData.id}.${exp}`
+    const secret = process.env.APP_SECRET || env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex')
+    const value = `${payload}.${signature}`
+
+    const response = NextResponse.json({ success: true, eventId: eventData.id })
+    response.cookies.set(`event_access_${eventData.id}`.toLowerCase(), value, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: expiresHours * 60 * 60,
     })
+
+    return response
   } catch (error) {
     console.error('Password verification error:', error)
     return NextResponse.json(

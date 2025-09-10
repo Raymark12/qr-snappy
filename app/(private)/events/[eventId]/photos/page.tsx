@@ -42,17 +42,25 @@ export default async function EventPhotosPage({ params }: EventPhotosPageProps) 
     notFound()
   }
 
-  if (!event.is_active) {
+  const supabase = await createServerSupabaseClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity
+  const currentUser = await getCurrentUser(supabase as any)
+
+  let hasAccess = false
+  if (currentUser) {
+    const isUserAdmin = currentUser.role === 'admin'
+    const isAssigned = isUserAdmin ? true : await isUserAssignedToEvent(event.id, currentUser.id)
+    hasAccess = isUserAdmin || isAssigned
+  }
+
+  // Shows event only for users with access if the event is inactive
+  if (!event.is_active && !hasAccess) {
     return (
       <AdminLayout>
         <EventNotAvailable />
       </AdminLayout>
     )
   }
-
-  const supabase = await createServerSupabaseClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity
-  const currentUser = await getCurrentUser(supabase as any)
 
   let canUpload = false
   if (currentUser) {

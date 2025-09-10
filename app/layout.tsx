@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Providers from './providers'
-import ErrorBoundary from '@/components/ErrorBoundary'
+import ErrorBoundary from '@/components/ui/ErrorBoundary'
 import { createMetadata } from '@/lib/metadata'
 
 const inter = Inter({ subsets: ['latin'] })
