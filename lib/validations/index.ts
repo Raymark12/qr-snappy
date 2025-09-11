@@ -28,3 +28,10 @@ export const eventIdParamSchema = z.object({
 })
 
 export type EventIdParam = z.infer<typeof eventIdParamSchema>
+
+export const photoIdParamSchema = z.object({
+  eventId: z.string().uuid('Invalid event ID'),
+  photoId: z.string().uuid('Invalid photo ID'),
+})
+
+export type PhotoIdParam = z.infer<typeof photoIdParamSchema>

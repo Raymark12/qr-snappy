@@ -5,7 +5,7 @@ const siteConfig = {
   name: 'QR Snappy',
   description: 'Share photos at events using QR codes. Create events, scan QR codes, and share memories instantly.',
   url: env.NEXT_PUBLIC_APP_URL,
-  ogImage: `${env.NEXT_PUBLIC_APP_URL}/og-image.png`,
+  ogImage: `${env.NEXT_PUBLIC_APP_URL}/qr_snappy_logo.png`,
 }
 
 export function createMetadata({

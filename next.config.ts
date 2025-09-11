@@ -7,9 +7,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '*.supabase.co',
         port: '',
-        pathname: '/storage/v1/object/public/**',
+        pathname: '/storage/v1/object/**', // Allow both public and signed URLs
       },
     ],
+    // Allow Supabase storage URLs with query parameters (for signed URLs)
+    unoptimized: true,
   },
   async headers() {
     return [
