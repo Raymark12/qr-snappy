@@ -11,6 +11,9 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Add role constraint to profiles table
+ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'user', 'client'));
+
 -- Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -54,7 +57,7 @@ CREATE TABLE IF NOT EXISTS photos (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved')),
   uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   reviewed_at TIMESTAMP WITH TIME ZONE,
-  reviewed_by UUID REFERENCES profiles(id)
+  reviewed_by UUID REFERENCES profiles(id) ON DELETE SET NULL
 );
 
 -- Enable Row Level Security
@@ -63,15 +66,56 @@ ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 
+-- Function to check if current user is admin (bypasses RLS to avoid recursion)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = 'admin'
+  );
+END;
+$$;
+
+-- Function to check if current user has a specific role (bypasses RLS to avoid recursion)
+CREATE OR REPLACE FUNCTION public.has_role(check_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid()
+    AND role = check_role
+  );
+END;
+$$;
+
 -- RLS Policies for profiles
 CREATE POLICY "Users can view their own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
 
+CREATE POLICY "Admins can view all profiles" ON profiles
+  FOR SELECT USING (public.is_admin());
+
 CREATE POLICY "Users can update their own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
+CREATE POLICY "Admins can update all profiles" ON profiles
+  FOR UPDATE USING (public.is_admin());
+
 CREATE POLICY "Users can insert their own profile" ON profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Admins can delete profiles" ON profiles
+  FOR DELETE USING (public.is_admin());
 
 -- RLS Policies for events
 -- Admins can see all events (active or not)
