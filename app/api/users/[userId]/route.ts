@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { requireAdmin } from '@/lib/utils/auth-helpers'
 import { createSupabaseAdmin } from '@/lib/supabase/client'
-import { getUserById, updateUser } from '@/lib/db/users'
+import { getUserById } from '@/lib/db/users'
 import { z } from 'zod'
 
 const updateUserSchema = z.object({
@@ -31,7 +31,6 @@ export async function PATCH(
 
     const supabase = createRouteSupabaseClient(req)
 
-    // Require admin access
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const authResult = await requireAdmin(supabase as any)
 
@@ -49,10 +48,23 @@ export async function PATCH(
       )
     }
 
-    const result = await updateUser(userId, validationResult.data)
+    // Use admin client to update user (bypasses RLS)
+    const adminClient = createSupabaseAdmin()
+    const updateData: Record<string, unknown> = {}
+    if (validationResult.data.email !== undefined) updateData.email = validationResult.data.email
+    if (validationResult.data.role !== undefined) updateData.role = validationResult.data.role
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 })
+    const { error: updateError } = await adminClient
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId)
+
+    if (updateError) {
+      console.error('Error updating user:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to update user', details: updateError.message },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ success: true })
@@ -93,20 +105,53 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Delete user from auth and profile
+    const adminClient = createSupabaseAdmin()
+
+    // Check if user has created any events
     if (userToDelete.role === 'admin') {
+      const { data: events } = await adminClient
+        .from('events')
+        .select('id')
+        .eq('admin_id', userId)
+        .limit(1)
+
+      if (events && events.length > 0) {
+        return NextResponse.json(
+          { error: 'Cannot delete admin user. User has created events. Please transfer or delete events first.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Clean up references
+    await adminClient
+      .from('photos')
+      .update({ reviewed_by: null })
+      .eq('reviewed_by', userId)
+
+    // Delete profile first
+    const { error: profileDeleteError } = await adminClient
+      .from('profiles')
+      .delete()
+      .eq('id', userId)
+
+    if (profileDeleteError) {
+      console.error('Error deleting profile:', profileDeleteError)
       return NextResponse.json(
-        { error: 'Cannot delete users with admin role. Please change their role first.' },
-        { status: 400 }
+        { error: 'Failed to delete user profile', details: profileDeleteError.message },
+        { status: 500 }
       )
     }
 
-    // Delete user from auth (this will cascade delete profile)
-    const adminClient = createSupabaseAdmin()
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
 
     if (deleteError) {
-      console.error('Error deleting user:', deleteError)
-      return NextResponse.json({ error: deleteError.message || 'Failed to delete user' }, { status: 500 })
+      console.error('Error deleting user from auth:', deleteError)
+      return NextResponse.json(
+        { error: 'Failed to delete user', details: deleteError.message },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ success: true })
