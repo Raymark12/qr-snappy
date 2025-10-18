@@ -46,7 +46,6 @@ export default function EventCard({ event }: EventCardProps) {
   const handleAccessClick = async () => {
     const isAuthorized = isAdmin || isModerator
 
-    // If authorized, check cache first
     if (isAuthorized) {
       setCheckingAccess(true)
       try {
@@ -176,7 +175,7 @@ export default function EventCard({ event }: EventCardProps) {
               textTransform: 'none',
             }}
           >
-            {checkingAccess ? 'Checking access...' : 'Access Event'}
+            {checkingAccess ? <CircularProgress size={24} /> : 'Access Event'}
           </Button>
         </CardActions>
       </Card>

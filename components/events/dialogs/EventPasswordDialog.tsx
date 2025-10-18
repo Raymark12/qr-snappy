@@ -15,7 +15,6 @@ import {
 } from '@mui/material'
 import { Lock as LockIcon } from '@mui/icons-material'
 import type { Event } from '@/types'
-import { useRouter } from 'next/navigation'
 import { apiPost } from '@/lib/utils/api-client'
 
 interface EventPasswordDialogProps {
@@ -25,11 +24,9 @@ interface EventPasswordDialogProps {
 }
 
 export default function EventPasswordDialog({ open, onClose, event }: EventPasswordDialogProps) {
-  const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
-  // no-op
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +48,7 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
         )
 
         if (data.success) {
-          router.push(`/events/${event.id}/photos`)
+          onClose()
         } else {
           setError(data.error || 'Invalid password')
           setPassword('')
