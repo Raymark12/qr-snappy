@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Box, Typography } from '@mui/material'
 import type { Photo } from '@/types'
 import PhotoItem from './PhotoItem'
@@ -10,24 +11,66 @@ import { getAuthenticatedImageUrl } from '@/lib/utils/storage'
 interface PhotosGridProps {
   photos: Photo[]
   eventId: string
+  publicMode?: boolean
 }
 
-export default function PhotosGrid({ photos, eventId }: PhotosGridProps) {
-  const [galleryOpen, setGalleryOpen] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(0)
+export default function PhotosGrid({ photos, eventId, publicMode = false }: PhotosGridProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const photoIndexParam = searchParams.get('photo')
+
+  // Parse and validate photo index from URL
+  const selectedIndex = useMemo(() => {
+    if (photoIndexParam === null) return 0
+    const index = parseInt(photoIndexParam, 10)
+    if (isNaN(index) || index < 0 || index >= photos.length) return 0
+    return index
+  }, [photoIndexParam, photos.length])
+
+  const galleryOpen = photoIndexParam !== null && selectedIndex < photos.length
+
+  const buildUrl = useCallback(
+    (photoIndex: number | null) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (photoIndex === null) {
+        params.delete('photo')
+      } else {
+        params.set('photo', photoIndex.toString())
+      }
+      const queryString = params.toString()
+      return queryString ? `${pathname}?${queryString}` : pathname
+    },
+    [searchParams, pathname]
+  )
+
+  const closeGallery = useCallback(() => {
+    router.replace(buildUrl(null), { scroll: false })
+  }, [router, buildUrl])
+
+  const openGallery = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < photos.length && photos[index]?.file_path) {
+        router.push(buildUrl(index), { scroll: false })
+      }
+    },
+    [photos, router, buildUrl]
+  )
+
+  const handleIndexChange = useCallback(
+    (index: number) => {
+      if (index >= 0 && index < photos.length) {
+        router.replace(buildUrl(index), { scroll: false })
+      }
+    },
+    [photos.length, router, buildUrl]
+  )
 
   useEffect(() => {
-    if (photos.length === 0) {
-      if (galleryOpen) {
-        setGalleryOpen(false)
-      }
-      setSelectedIndex(0)
-    } else if (galleryOpen && selectedIndex >= photos.length) {
-      setGalleryOpen(false)
-      setSelectedIndex(0)
+    if (galleryOpen && (photos.length === 0 || selectedIndex >= photos.length)) {
+      closeGallery()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos.length])
+  }, [photos.length, galleryOpen, selectedIndex, closeGallery])
 
   if (!photos.length) {
     return (
@@ -40,13 +83,6 @@ export default function PhotosGrid({ photos, eventId }: PhotosGridProps) {
         </Typography>
       </Box>
     )
-  }
-
-  const handlePhotoClick = (index: number) => {
-    if (index >= 0 && index < photos.length && photos[index]?.file_path) {
-      setSelectedIndex(index)
-      setGalleryOpen(true)
-    }
   }
 
   return (
@@ -70,9 +106,10 @@ export default function PhotosGrid({ photos, eventId }: PhotosGridProps) {
             photo={photo}
             eventId={eventId}
             priority={index === 0}
+            publicMode={publicMode}
             onClick={() => {
               if (photo.file_path && photo.file_path !== '') {
-                handlePhotoClick(index)
+                openGallery(index)
               }
             }}
           />
@@ -83,8 +120,9 @@ export default function PhotosGrid({ photos, eventId }: PhotosGridProps) {
         photos={photos}
         initialIndex={selectedIndex}
         open={galleryOpen}
-        onClose={() => setGalleryOpen(false)}
-        getImageUrl={getAuthenticatedImageUrl}
+        onClose={closeGallery}
+        onIndexChange={handleIndexChange}
+        getImageUrl={(path: string) => getAuthenticatedImageUrl(path, { publicMode, eventId })}
       />
     </>
   )

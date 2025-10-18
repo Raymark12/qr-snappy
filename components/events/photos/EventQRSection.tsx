@@ -17,6 +17,7 @@ interface EventQRSectionProps {
   eventTitle?: string
   eventDescription?: string | null
   backgroundImagePath?: string | null
+  publicMode?: boolean
 }
 
 export default function EventQRSection({
@@ -24,6 +25,7 @@ export default function EventQRSection({
   eventTitle,
   eventDescription,
   backgroundImagePath,
+  publicMode = false,
 }: EventQRSectionProps) {
   const [loading, setLoading] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
@@ -64,7 +66,10 @@ export default function EventQRSection({
       if (backgroundImagePath) {
         try {
           setBackgroundLoading(true)
-          const url = await getAuthenticatedImageUrl(backgroundImagePath)
+          const url = await getAuthenticatedImageUrl(backgroundImagePath, {
+            publicMode,
+            eventId,
+          })
           setBackgroundUrl(url)
         } catch (err) {
           console.error('Failed to load background image:', err)
@@ -77,7 +82,7 @@ export default function EventQRSection({
       }
     }
     loadBackground()
-  }, [backgroundImagePath])
+  }, [backgroundImagePath, publicMode, eventId])
 
   const handleBackgroundChange = () => {
     backgroundInputRef.current?.click()
@@ -321,58 +326,100 @@ export default function EventQRSection({
           style={{ display: 'none' }}
           onChange={handleBackgroundSelect}
         />
-        <Button
-          variant="outlined"
-          startIcon={<WallpaperIcon />}
-          onClick={handleBackgroundChange}
-          disabled={loading || backgroundLoading}
-          sx={{ textTransform: 'none' }}
-        >
-          {backgroundLoading
-            ? 'Uploading...'
-            : backgroundUrl
-              ? 'Change Background'
-              : 'Set Background'}
-        </Button>
-        {backgroundUrl && (
-          <Button
-            variant="outlined"
-            startIcon={<DeleteIcon />}
-            onClick={handleBackgroundDelete}
-            disabled={loading || backgroundLoading}
-            sx={{ textTransform: 'none', color: 'error.main', borderColor: 'error.main' }}
-          >
-            Remove Background
-          </Button>
+
+        {!publicMode && (
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<WallpaperIcon />}
+              onClick={handleBackgroundChange}
+              disabled={loading || backgroundLoading}
+              sx={{
+                textTransform: 'none',
+                bgcolor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                },
+              }}
+            >
+              {backgroundLoading
+                ? 'Uploading...'
+                : backgroundUrl
+                  ? 'Change Background'
+                  : 'Set Background'}
+            </Button>
+            {backgroundUrl && (
+              <Button
+                variant="outlined"
+                startIcon={<DeleteIcon />}
+                onClick={handleBackgroundDelete}
+                disabled={loading || backgroundLoading}
+                sx={{
+                  textTransform: 'none',
+                  color: 'error.main',
+                  borderColor: 'error.main',
+                  bgcolor: 'rgba(211, 47, 47, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  '&:hover': {
+                    bgcolor: 'rgba(211, 47, 47, 0.2)',
+                  },
+                }}
+              >
+                Remove Background
+              </Button>
+            )}
+            <Button
+              variant="outlined"
+              startIcon={<ImageIcon />}
+              onClick={onSelectImage}
+              disabled={loading}
+              sx={{
+                textTransform: 'none',
+                bgcolor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                },
+              }}
+            >
+              Choose Logo & Generate
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={loading ? <CircularProgress size={18} /> : <QrIcon />}
+              onClick={() => handleGenerate()}
+              disabled={loading}
+              sx={{
+                textTransform: 'none',
+                bgcolor: 'rgba(25, 118, 210, 0.8)',
+                backdropFilter: 'blur(10px)',
+                '&:hover': {
+                  bgcolor: 'rgba(25, 118, 210, 0.9)',
+                },
+              }}
+            >
+              {loading ? 'Generating...' : 'Generate QR'}
+            </Button>
+          </>
         )}
-        <Button
-          variant="outlined"
-          startIcon={<ImageIcon />}
-          onClick={onSelectImage}
-          disabled={loading}
-          sx={{ textTransform: 'none' }}
-        >
-          Choose Logo & Generate
-        </Button>
         {qrUrl && (
           <Button
             variant="outlined"
             onClick={handleDownload}
             disabled={loading}
-            sx={{ textTransform: 'none' }}
+            sx={{
+              textTransform: 'none',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              },
+            }}
           >
             Download QR
           </Button>
         )}
-        <Button
-          variant="contained"
-          startIcon={loading ? <CircularProgress size={18} /> : <QrIcon />}
-          onClick={() => handleGenerate()}
-          disabled={loading}
-          sx={{ textTransform: 'none' }}
-        >
-          {loading ? 'Generating...' : 'Generate QR'}
-        </Button>
       </Box>
     </Paper>
   )

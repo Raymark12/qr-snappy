@@ -16,11 +16,24 @@ import {
 } from '@mui/icons-material'
 import type { Photo } from '@/types'
 
+function createSlideToPhotoIndexMap(photos: Photo[]): Map<number, number> {
+  const map = new Map<number, number>()
+  let slideIndex = 0
+  for (let photoIndex = 0; photoIndex < photos.length; photoIndex++) {
+    if (photos[photoIndex]?.file_path && photos[photoIndex].file_path !== '') {
+      map.set(slideIndex, photoIndex)
+      slideIndex++
+    }
+  }
+  return map
+}
+
 interface PhotoGalleryProps {
   photos: Photo[]
   initialIndex: number
   open: boolean
   onClose: () => void
+  onIndexChange?: (index: number) => void
   getImageUrl: (filePath: string) => Promise<string>
 }
 
@@ -29,6 +42,7 @@ export default function PhotoGallery({
   initialIndex,
   open,
   onClose,
+  onIndexChange,
   getImageUrl,
 }: PhotoGalleryProps) {
   const [slides, setSlides] = useState<
@@ -40,6 +54,8 @@ export default function PhotoGallery({
   >([])
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
+
+  const slideToPhotoMap = useMemo(() => createSlideToPhotoIndexMap(photos), [photos])
 
   const loadImages = useCallback(async () => {
     if (!open || photos.length === 0) {
@@ -208,6 +224,10 @@ export default function PhotoGallery({
           view: ({ index }) => {
             if (typeof index === 'number' && index !== currentIndex) {
               setCurrentIndex(index)
+              const photoIndex = slideToPhotoMap.get(index)
+              if (photoIndex !== undefined) {
+                onIndexChange?.(photoIndex)
+              }
             }
           },
         }}

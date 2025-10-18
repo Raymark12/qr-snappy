@@ -17,9 +17,15 @@ type UploadItem = {
 
 interface PhotoUploaderProps {
   eventId: string
+  publicMode?: boolean
+  simple?: boolean
 }
 
-export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
+export default function PhotoUploader({
+  eventId,
+  publicMode = false,
+  simple = false,
+}: PhotoUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const timeoutRefs = useRef<Set<NodeJS.Timeout>>(new Set())
   const [uploads, setUploads] = useState<UploadItem[]>([])
@@ -29,10 +35,9 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(
     null
   )
-  const uploadMutation = useUploadPhoto(eventId)
+  const uploadMutation = useUploadPhoto(eventId, publicMode)
   const showToast = useToastStore(state => state.showToast)
 
-  // Cleanup timeouts on unmount to prevent memory leaks
   useEffect(() => {
     const timeouts = timeoutRefs.current
     return () => {
@@ -74,7 +79,6 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
         prev.map(u => (u.id === uploadId ? { ...u, status: 'success' as const } : u))
       )
 
-      // Only show individual toast for single file uploads
       if (!suppressToast) {
         showToast(`${file.name} uploaded successfully`, 'success')
       }
@@ -95,7 +99,6 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
         )
       )
 
-      // Only show individual toast for single file uploads
       if (!suppressToast) {
         const errorMsg = error instanceof Error ? error.message : 'Upload failed'
         showToast(`Failed to upload ${file.name}: ${errorMsg}`, 'error')
@@ -221,74 +224,94 @@ export default function PhotoUploader({ eventId }: PhotoUploaderProps) {
       />
 
       <Box sx={{ p: 0 }}>
-        <Box
-          onDragOver={e => {
-            e.preventDefault()
-            setIsDragging(true)
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={e => {
-            e.preventDefault()
-            setIsDragging(false)
-            onFilesSelected(e.dataTransfer.files)
-          }}
-          sx={{
-            border: '2px dashed',
-            borderColor: isDragging ? 'primary.main' : 'grey.300',
-            borderRadius: 2,
-            p: 3,
-            textAlign: 'center',
-            bgcolor: isDragging ? 'action.hover' : 'transparent',
-            transition: 'all 0.2s',
-          }}
-        >
-          <CloudUploadIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
-          <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
-            Drag and drop images here
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-            or
-          </Typography>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            onChange={e => onFilesSelected(e.target.files)}
-          />
-          <Button
-            variant="contained"
-            startIcon={<CloudUploadIcon />}
-            onClick={() => inputRef.current?.click()}
-            sx={{ textTransform: 'none' }}
-            disabled={activeUploads.length > 0}
-          >
-            Select images
-          </Button>
-          <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-            Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per image •{' '}
-            {FILE_UPLOAD.ALLOWED_EXTENSIONS.join(', ')}
-          </Typography>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={e => onFilesSelected(e.target.files)}
+        />
 
-          {activeUploads.length > 0 && (
-            <Typography variant="body2" sx={{ mt: 2, color: 'primary.main', fontWeight: 500 }}>
-              Uploading {activeUploads.length} {activeUploads.length === 1 ? 'photo' : 'photos'}...
+        {simple ? (
+          <Box sx={{ textAlign: { xs: 'center', md: 'left' } }}>
+            <Button
+              variant="contained"
+              startIcon={<CloudUploadIcon />}
+              onClick={() => inputRef.current?.click()}
+              sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}
+              disabled={activeUploads.length > 0}
+            >
+              {activeUploads.length > 0 ? 'Uploading...' : 'Upload photos'}
+            </Button>
+            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+              Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per image •{' '}
+              {FILE_UPLOAD.ALLOWED_EXTENSIONS.join(', ')}
             </Typography>
-          )}
+          </Box>
+        ) : (
+          <Box
+            onDragOver={e => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={e => {
+              e.preventDefault()
+              setIsDragging(false)
+              onFilesSelected(e.dataTransfer.files)
+            }}
+            sx={{
+              border: '2px dashed',
+              borderColor: isDragging ? 'primary.main' : 'grey.300',
+              borderRadius: 2,
+              p: 3,
+              textAlign: 'center',
+              bgcolor: isDragging ? 'action.hover' : 'transparent',
+              transition: 'all 0.2s',
+            }}
+          >
+            <CloudUploadIcon sx={{ fontSize: 48, color: 'grey.400', mb: 1 }} />
+            <Typography variant="body1" sx={{ mb: 1, fontWeight: 500 }}>
+              Drag and drop images here
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              or
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<CloudUploadIcon />}
+              onClick={() => inputRef.current?.click()}
+              sx={{ textTransform: 'none' }}
+              disabled={activeUploads.length > 0}
+            >
+              Select images
+            </Button>
+            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+              Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per image •{' '}
+              {FILE_UPLOAD.ALLOWED_EXTENSIONS.join(', ')}
+            </Typography>
 
-          {uploadProgress && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Progress: {uploadProgress.current} / {uploadProgress.total}
+            {activeUploads.length > 0 && (
+              <Typography variant="body2" sx={{ mt: 2, color: 'primary.main', fontWeight: 500 }}>
+                Uploading {activeUploads.length} {activeUploads.length === 1 ? 'photo' : 'photos'}
+                ...
               </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={(uploadProgress.current / uploadProgress.total) * 100}
-              />
-            </Box>
-          )}
-        </Box>
+            )}
+
+            {uploadProgress && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Progress: {uploadProgress.current} / {uploadProgress.total}
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={(uploadProgress.current / uploadProgress.total) * 100}
+                />
+              </Box>
+            )}
+          </Box>
+        )}
       </Box>
     </>
   )

@@ -17,9 +17,16 @@ interface PhotoItemProps {
   eventId: string
   onClick?: () => void
   priority?: boolean // For LCP optimization - set on first image above the fold
+  publicMode?: boolean
 }
 
-export default function PhotoItem({ photo, eventId, onClick, priority = false }: PhotoItemProps) {
+export default function PhotoItem({
+  photo,
+  eventId,
+  onClick,
+  priority = false,
+  publicMode = false,
+}: PhotoItemProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -27,39 +34,35 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
   const [confirmDialogType, setConfirmDialogType] = useState<'reject' | 'delete'>('reject')
   const isModerator = useIsEventModerator(eventId)
   const showApproveReject = isModerator && photo.status === 'pending'
-  const showDelete = isModerator // Moderators (admin or assigned client) can delete any photo
+  const showDelete = isModerator
 
-  // Use usePhotoActions hook directly - no props needed!
   const { approvePhoto, rejectPhoto, deletePhoto } = usePhotoActions(eventId)
 
-  // Helper: Check if photo has a valid file path (not optimistic photo during upload)
   const hasValidFilePath = useMemo(
     () => photo.file_path && photo.file_path !== '',
     [photo.file_path]
   )
 
-  // Helper: Stop event propagation to prevent parent click handlers
   const stopEventPropagation = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
-    e.preventDefault()
+    if (!('touches' in e.nativeEvent)) {
+      e.preventDefault()
+    }
   }
 
   useEffect(() => {
-    // Skip loading if file_path is empty (optimistic photo during upload)
     if (!hasValidFilePath) {
       setLoading(false)
       setImageUrl(null)
       return
     }
 
-    // Reset error state when file_path changes
     setImageError(false)
     setLoading(true)
 
     let cancelled = false
 
-    // Use photo.file_path directly (we've already checked hasValidFilePath above)
-    getAuthenticatedImageUrl(photo.file_path)
+    getAuthenticatedImageUrl(photo.file_path, { publicMode, eventId })
       .then(url => {
         if (!cancelled) {
           setImageUrl(url)
@@ -74,30 +77,24 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
         }
       })
 
-    // Cleanup to prevent state updates if component unmounts or file_path changes
     return () => {
       cancelled = true
     }
-    // Use photo.file_path directly (primitive value) - this is the actual dependency
-    // hasValidFilePath is memoized from photo.file_path, so it will change when photo.file_path changes
-    // We include both for clarity: hasValidFilePath for the check, photo.file_path for the actual value used
-  }, [hasValidFilePath, photo.file_path])
+  }, [hasValidFilePath, photo.file_path, publicMode, eventId])
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    // Don't download if file_path is empty (optimistic photo)
     if (!hasValidFilePath) {
       return
     }
     try {
-      const url = await getAuthenticatedImageUrl(photo.file_path)
+      const url = await getAuthenticatedImageUrl(photo.file_path, { publicMode, eventId })
       const response = await fetch(url)
       const blob = await response.blob()
       const blobUrl = URL.createObjectURL(blob)
 
       const link = document.createElement('a')
       link.href = blobUrl
-      // Use generic filename for download (prevent inappropriate filenames)
       const extension = photo.file_name.split('.').pop() || 'jpg'
       link.download = `photo-${photo.id}.${extension}`
       document.body.appendChild(link)
@@ -114,9 +111,7 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
     e.stopPropagation()
     try {
       await approvePhoto.mutateAsync(photo.id)
-      // Toast is handled automatically by usePhotoActions
     } catch (error) {
-      // Error toast is handled automatically by usePhotoActions
       console.error('Failed to approve photo:', error)
     }
   }
@@ -141,18 +136,13 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
       if (confirmDialogType === 'reject') {
         await rejectPhoto.mutateAsync(photo.id)
       } else {
-        // Delete photo - this will remove it from the array via optimistic update
-        // The mutation will immediately update the cache, removing the photo
         await deletePhoto.mutateAsync(photo.id)
       }
-      // Toast is handled automatically by usePhotoActions
     } catch (error) {
-      // Error toast is handled automatically by usePhotoActions
       console.error(`Failed to ${confirmDialogType} photo:`, error)
     }
   }
 
-  // Show loading or placeholder for optimistic photos (no file_path yet)
   if (loading || !hasValidFilePath) {
     return (
       <Box
@@ -344,18 +334,14 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
             left: 0,
             right: 0,
             display: 'flex',
-            gap: 0.5,
-            p: 0.5,
-            bgcolor: 'rgba(0,0,0,0.7)',
-            opacity: 0,
-            transition: 'opacity 0.3s ease',
+            gap: 0,
+            p: 0,
+            bgcolor: 'transparent',
+            opacity: 1,
             zIndex: 15,
-            '.MuiBox-root:hover &': {
-              opacity: 1,
-            },
-            '@media (hover: none)': {
-              opacity: 1,
-            },
+            overflow: 'hidden',
+            borderBottomLeftRadius: 2,
+            borderBottomRightRadius: 2,
           }}
         >
           <Button
@@ -369,11 +355,16 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
             disabled={approvePhoto.isPending}
             sx={{
               flex: 1,
-              minHeight: 32,
-              fontSize: 11,
-              px: 2,
+              height: 28,
+              minHeight: 28,
+              maxHeight: 28,
+              fontSize: 10,
+              px: 1,
+              py: 0.5,
               textTransform: 'none',
               fontWeight: 500,
+              borderRadius: 0,
+              borderBottomLeftRadius: 2,
             }}
           >
             {approvePhoto.isPending ? '...' : 'Approve'}
@@ -389,11 +380,16 @@ export default function PhotoItem({ photo, eventId, onClick, priority = false }:
             disabled={rejectPhoto.isPending}
             sx={{
               flex: 1,
-              minHeight: 32,
-              fontSize: 11,
-              px: 2,
+              height: 28,
+              minHeight: 28,
+              maxHeight: 28,
+              fontSize: 10,
+              px: 1,
+              py: 0.5,
               textTransform: 'none',
               fontWeight: 500,
+              borderRadius: 0,
+              borderBottomRightRadius: 2,
             }}
           >
             {rejectPhoto.isPending ? '...' : 'Reject'}

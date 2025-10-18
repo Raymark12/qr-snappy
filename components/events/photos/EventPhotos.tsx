@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Box, Button, Alert, Container, Typography, Paper, Skeleton } from '@mui/material'
 import { ArrowBack as BackIcon } from '@mui/icons-material'
 import Link from 'next/link'
@@ -20,7 +20,6 @@ export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
   const { data: photos, isLoading, error } = useEventPhotos(event.id)
   const [showContent, setShowContent] = useState(false)
 
-  // Wait for initial load plus a small delay to let images load
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null
 
@@ -82,7 +81,7 @@ export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
         {canUpload && (
           <ErrorBoundary>
             <Box sx={{ mb: 4 }}>
-              <PhotoUploader eventId={event.id} />
+              <PhotoUploader eventId={event.id} simple />
             </Box>
           </ErrorBoundary>
         )}
@@ -95,12 +94,38 @@ export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
 
         {!error && photos && (
           <ErrorBoundary>
-            <PhotosGrid photos={photos} eventId={event.id} />
+            <Suspense
+              fallback={
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                      xs: 'repeat(2, 1fr)',
+                      sm: 'repeat(3, 1fr)',
+                      md: 'repeat(4, 1fr)',
+                      lg: 'repeat(5, 1fr)',
+                      xl: 'repeat(6, 1fr)',
+                    },
+                    gap: { xs: 1.5, md: 2 },
+                  }}
+                >
+                  {[...Array(12)].map((_, i) => (
+                    <Skeleton
+                      key={i}
+                      variant="rectangular"
+                      width="100%"
+                      sx={{ aspectRatio: '1/1', borderRadius: 2 }}
+                    />
+                  ))}
+                </Box>
+              }
+            >
+              <PhotosGrid photos={photos} eventId={event.id} />
+            </Suspense>
           </ErrorBoundary>
         )}
       </Paper>
 
-      {/* Show skeleton overlay while loading */}
       {(!showContent || isLoading) && (
         <>
           <Box sx={{ mb: 4 }}>
