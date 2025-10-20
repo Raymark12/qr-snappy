@@ -13,19 +13,23 @@ export type PhotoMutationContext = {
   previousPhotos: Photo[] | undefined
 }
 
-async function fetchEventPhotos(eventId: string): Promise<Photo[]> {
-  return apiGet<Photo[]>(`/api/events/${eventId}/photos`)
+async function fetchEventPhotos(eventId: string, publicMode = false): Promise<Photo[]> {
+  const endpoint = publicMode ? `/api/public/events/${eventId}/photos` : `/api/events/${eventId}/photos`
+  return apiGet<Photo[]>(endpoint)
 }
 
 async function uploadPhoto(
   eventId: string,
-  data: { file: File; author?: string; comment?: string }
+  data: { file: File; author?: string; comment?: string },
+  publicMode = false
 ): Promise<{ success: boolean; id: string }> {
   const formData = new FormData()
   formData.append('file', data.file)
   if (data.author) formData.append('author', data.author)
   if (data.comment) formData.append('comment', data.comment)
-  const res = await fetch(`/api/events/${eventId}/photos`, {
+
+  const endpoint = publicMode ? `/api/public/events/${eventId}/photos` : `/api/events/${eventId}/photos`
+  const res = await fetch(endpoint, {
     method: 'POST',
     body: formData,
   })
@@ -38,28 +42,30 @@ async function uploadPhoto(
   return res.json()
 }
 
-export function useEventPhotos(eventId: string) {
+export function useEventPhotos(eventId: string, publicMode = false, enabled = true) {
   return useQuery({
-    queryKey: photoKeys.event(eventId),
-    queryFn: () => fetchEventPhotos(eventId),
+    queryKey: [...photoKeys.event(eventId), publicMode ? 'public' : 'private'],
+    queryFn: () => fetchEventPhotos(eventId, publicMode),
     staleTime: QUERY.PHOTOS_STALE_TIME,
     refetchInterval: QUERY.PHOTOS_REFETCH_INTERVAL,
     refetchOnWindowFocus: false,
+    enabled,
   })
 }
 
-export function useUploadPhoto(eventId: string) {
+export function useUploadPhoto(eventId: string, publicMode = false) {
   const queryClient = useQueryClient()
+  const queryKey = [...photoKeys.event(eventId), publicMode ? 'public' : 'private']
 
   return useMutation({
     mutationFn: (data: { file: File; author?: string; comment?: string }) =>
-      uploadPhoto(eventId, data),
+      uploadPhoto(eventId, data, publicMode),
     onMutate: async (uploadData) => {
-      await queryClient.cancelQueries({ queryKey: photoKeys.event(eventId) })
+      await queryClient.cancelQueries({ queryKey })
 
-      const previousPhotos = queryClient.getQueryData<Photo[]>(photoKeys.event(eventId))
+      const previousPhotos = queryClient.getQueryData<Photo[]>(queryKey)
 
-      if (previousPhotos) {
+      if (!publicMode && previousPhotos) {
         const optimisticPhoto: Photo = {
           id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           event_id: eventId,
@@ -75,7 +81,7 @@ export function useUploadPhoto(eventId: string) {
         }
 
         queryClient.setQueryData<Photo[]>(
-          photoKeys.event(eventId),
+          queryKey,
           [optimisticPhoto, ...previousPhotos]
         )
       }
@@ -86,14 +92,20 @@ export function useUploadPhoto(eventId: string) {
     onError: (_err, _uploadData, context) => {
 
       if (context?.previousPhotos) {
-        queryClient.setQueryData(photoKeys.event(eventId), context.previousPhotos)
+        queryClient.setQueryData(queryKey, context.previousPhotos)
       }
     },
     onSuccess: async (data) => {
       if (data.id) {
+        // In public mode, just invalidate since pending photos won't show up
+        if (publicMode) {
+          queryClient.invalidateQueries({ queryKey })
+          return
+        }
+
         try {
-          const updatedPhotos = await fetchEventPhotos(eventId)
-          const currentPhotos = queryClient.getQueryData<Photo[]>(photoKeys.event(eventId))
+          const updatedPhotos = await fetchEventPhotos(eventId, publicMode)
+          const currentPhotos = queryClient.getQueryData<Photo[]>(queryKey)
 
           if (currentPhotos && updatedPhotos) {
             const optimisticIndex = currentPhotos.findIndex((p) => p.id.startsWith('temp-'))
@@ -102,17 +114,17 @@ export function useUploadPhoto(eventId: string) {
               if (realPhoto) {
                 const newPhotos = [...currentPhotos]
                 newPhotos[optimisticIndex] = realPhoto
-                queryClient.setQueryData(photoKeys.event(eventId), newPhotos)
+                queryClient.setQueryData(queryKey, newPhotos)
               } else {
-                queryClient.setQueryData(photoKeys.event(eventId), updatedPhotos)
+                queryClient.setQueryData(queryKey, updatedPhotos)
               }
             } else {
-              queryClient.setQueryData(photoKeys.event(eventId), updatedPhotos)
+              queryClient.setQueryData(queryKey, updatedPhotos)
             }
           }
         } catch (error) {
           console.error('Failed to update photo after upload:', error)
-          queryClient.invalidateQueries({ queryKey: photoKeys.event(eventId) })
+          queryClient.invalidateQueries({ queryKey })
         }
       }
     },
