@@ -3,9 +3,39 @@ import { env } from '@/lib/env'
 import { STORAGE } from '@/lib/constants'
 import { parseStoragePath } from './file-validation'
 
-export async function getAuthenticatedImageUrl(filePath: string): Promise<string> {
+export async function getAuthenticatedImageUrl(
+  filePath: string,
+  options?: { publicMode?: boolean; eventId?: string }
+): Promise<string> {
   if (!filePath || filePath.trim() === '') {
     throw new Error('Invalid file path')
+  }
+
+  // Use public API endpoint for anonymous users with access cookie
+  if (options?.publicMode && options?.eventId) {
+    try {
+      const response = await fetch(`/api/public/events/${options.eventId}/signed-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ filePath }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to get signed URL: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      if (data.url) {
+        return data.url
+      }
+      throw new Error('No URL in response')
+    } catch (err) {
+      console.error('Failed to get public signed URL:', err)
+      const fullPath = filePath.startsWith(STORAGE.BUCKET_NAME) ? filePath : `${STORAGE.BUCKET_NAME}/${filePath}`
+      return `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${fullPath}`
+    }
   }
 
   const supabase = createSupabaseClient()
