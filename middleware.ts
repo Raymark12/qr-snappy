@@ -46,7 +46,16 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
+  // Redirect unauthenticated users away from private app pages
+  const path = request.nextUrl.pathname
+  const isApiRoute = path.startsWith('/api')
+
+  if (!isApiRoute && path.startsWith('/dashboard') && !user) {
+    const redirectUrl = new URL('/', request.url)
+    redirectUrl.searchParams.set('redirected', 'true')
+    return NextResponse.redirect(redirectUrl)
+  }
+  if (!isApiRoute && path.startsWith('/events') && !user) {
     const redirectUrl = new URL('/', request.url)
     redirectUrl.searchParams.set('redirected', 'true')
     return NextResponse.redirect(redirectUrl)
