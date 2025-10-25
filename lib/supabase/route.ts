@@ -1,8 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
+import { NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 import { env } from '@/lib/env'
 
-function parseCookies(request: Request) {
+function parseCookies(request: Request | NextRequest) {
   const cookieHeader = request.headers.get('cookie') ?? ''
   const pairs = cookieHeader
     .split(';')
@@ -23,7 +24,7 @@ function parseCookies(request: Request) {
  * Create Supabase client for API route handlers
  * Reads cookies from Request object
  */
-export function createRouteSupabaseClient(request: Request) {
+export function createRouteSupabaseClient(request: Request | NextRequest) {
   const cookieMap = parseCookies(request)
 
   return createServerClient<Database>(

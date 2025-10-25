@@ -1,12 +1,22 @@
 export const FILE_UPLOAD = {
-  /** Maximum file size in bytes (10MB) */
-  MAX_SIZE_BYTES: 10 * 1024 * 1024,
+  /** Maximum file size in bytes (100MB for videos) */
+  MAX_SIZE_BYTES: 100 * 1024 * 1024,
   /** Maximum file size for display */
-  MAX_SIZE_DISPLAY: '10MB',
-  /** Allowed MIME types for image uploads */
-  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const,
+  MAX_SIZE_DISPLAY: '100MB',
+  /** Allowed MIME types for image and video uploads */
+  ALLOWED_TYPES: [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+    'video/mp4',
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/webm'
+  ] as const,
   /** Allowed file extensions (for display) */
-  ALLOWED_EXTENSIONS: ['JPG', 'PNG', 'WEBP', 'HEIC'],
+  ALLOWED_EXTENSIONS: ['JPG', 'PNG', 'WEBP', 'HEIC', 'MP4', 'MOV', 'AVI', 'WEBM'],
   /** Concurrency limit for parallel uploads */
   UPLOAD_CONCURRENCY: 3,
   /** Maximum number of files per upload batch */
@@ -18,6 +28,8 @@ export const STORAGE = {
   BUCKET_NAME: 'Photos',
   /** Signed URL expiry in seconds (1 hour) */
   SIGNED_URL_EXPIRY: 3600,
+  /** R2 Signed URL expiry in seconds (1 hour) */
+  R2_SIGNED_URL_EXPIRY: 3600,
 } as const
 
 export const AUTH = {

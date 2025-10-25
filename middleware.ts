@@ -3,6 +3,20 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { env } from '@/lib/env'
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
+  const isDashboardRoute = path.startsWith('/dashboard')
+
+  // Skip middleware entirely for /events routes
+  if (path.startsWith('/events')) {
+    return NextResponse.next()
+  }
+
+  // Only run auth checks for dashboard and root routes
+  if (!isDashboardRoute && path !== '/') {
+    return NextResponse.next()
+  }
+
+  // Only create Supabase client and check auth for routes that need it
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -46,22 +60,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users away from private app pages
-  const path = request.nextUrl.pathname
-  const isApiRoute = path.startsWith('/api')
-
-  if (!isApiRoute && path.startsWith('/dashboard') && !user) {
-    const redirectUrl = new URL('/', request.url)
-    redirectUrl.searchParams.set('redirected', 'true')
-    return NextResponse.redirect(redirectUrl)
-  }
-  if (!isApiRoute && path.startsWith('/events') && !user) {
+  if (isDashboardRoute && !user) {
     const redirectUrl = new URL('/', request.url)
     redirectUrl.searchParams.set('redirected', 'true')
     return NextResponse.redirect(redirectUrl)
   }
 
-  if (request.nextUrl.pathname === '/' && user) {
+  // Redirect authenticated users from home to dashboard
+  if (path === '/' && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
@@ -70,7 +76,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/',
+    '/dashboard/:path*',
   ],
 }
 

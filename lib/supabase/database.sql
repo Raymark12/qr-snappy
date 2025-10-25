@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS events (
   admin_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   is_active BOOLEAN DEFAULT true,
   background_image_path TEXT,
+  auto_approve BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -269,8 +270,8 @@ CREATE POLICY "Assigned clients can view all photos for their events" ON photos
 CREATE POLICY "Anyone can insert photos to active events" ON photos
   FOR INSERT WITH CHECK (
     EXISTS (
-      SELECT 1 FROM events 
-      WHERE events.id = event_id 
+      SELECT 1 FROM events
+      WHERE events.id = event_id
       AND events.is_active = true
     )
   );
@@ -450,14 +451,18 @@ USING (
 
 -- Performance indexes
 -- Add indexes for better photo query performance
-CREATE INDEX IF NOT EXISTS idx_photos_event_status_uploaded 
+CREATE INDEX IF NOT EXISTS idx_photos_event_status_uploaded
 ON photos(event_id, status, uploaded_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_photos_status_uploaded 
+CREATE INDEX IF NOT EXISTS idx_photos_status_uploaded
 ON photos(status, uploaded_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_photos_user_email 
-ON photos(user_email) WHERE user_email IS NOT NULL;
+-- Additional indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_photos_user_email ON photos(user_email) WHERE user_email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_photos_uploaded_at ON photos(uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_events_admin_id ON events(admin_id);
+CREATE INDEX IF NOT EXISTS idx_events_is_active ON events(is_active);
+CREATE INDEX IF NOT EXISTS idx_event_assignments_client_event ON event_assignments(client_id, event_id);
 
 -- 5. Admins and assigned clients can update/move photos
 CREATE POLICY "Admins can update Photos bucket"
