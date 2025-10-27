@@ -1,4 +1,5 @@
 import { FILE_UPLOAD, STORAGE } from '@/lib/constants'
+import { env } from '@/lib/env'
 
 export interface FileValidationResult {
   valid: boolean
@@ -51,7 +52,7 @@ export function getFileExtension(filename: string): string {
   if (lastDot === -1 || lastDot === filename.length - 1) {
     return ''
   }
-  return filename.substring(lastDot).toLowerCase()
+  return filename.substring(lastDot + 1).toLowerCase()
 }
 
 /**
@@ -73,5 +74,22 @@ export function parseStoragePath(fullPath: string): {
     bucket,
     path: rest.join('/'),
   }
+}
+
+export function isVideoFile(file: File): boolean {
+  return file.type.startsWith('video/')
+}
+
+export function isVideoFileName(filename: string): boolean {
+  const extension = getFileExtension(filename).toLowerCase()
+  return ['mp4', 'mov', 'avi', 'webm', 'm4v', 'mkv'].includes(extension)
+}
+
+export function getMediaStoragePath(eventId: string, filename: string): string {
+  const extension = getFileExtension(filename)
+  const objectName = `${crypto.randomUUID()}${extension}`
+  // Use R2 bucket name from environment instead of hardcoded STORAGE.BUCKET_NAME
+  const bucketName = env.R2_BUCKET_NAME || STORAGE.BUCKET_NAME
+  return `${bucketName}/events/${eventId}/photos/${objectName}`
 }
 

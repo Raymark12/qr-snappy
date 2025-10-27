@@ -45,6 +45,7 @@ export interface Database {
           password: string
           admin_id: string
           is_active: boolean
+          background_image_path: string | null
           created_at: string
           updated_at: string
         }
@@ -55,6 +56,7 @@ export interface Database {
           password: string
           admin_id: string
           is_active?: boolean
+          background_image_path?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -65,6 +67,7 @@ export interface Database {
           password?: string
           admin_id?: string
           is_active?: boolean
+          background_image_path?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -142,7 +145,7 @@ export interface Database {
           file_name: string
           author?: string | null
           comment?: string | null
-          status?: 'pending' | 'approved' | 'rejected'
+          status?: 'pending' | 'approved'
           uploaded_at?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -155,7 +158,7 @@ export interface Database {
           file_name?: string
           author?: string | null
           comment?: string | null
-          status?: 'pending' | 'approved' | 'rejected'
+          status?: 'pending' | 'approved'
           uploaded_at?: string
           reviewed_at?: string | null
           reviewed_by?: string | null

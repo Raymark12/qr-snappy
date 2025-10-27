@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { AUTH, VALIDATION } from '@/lib/constants'
+import { AUTH } from '@/lib/constants'
 
 export const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -9,9 +9,10 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>
 
 export const createEventSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(VALIDATION.MAX_EVENT_TITLE_LENGTH, 'Title too long'),
-  description: z.string().max(VALIDATION.MAX_EVENT_DESCRIPTION_LENGTH, 'Description too long').optional(),
-  password: z.string().min(AUTH.MIN_EVENT_PASSWORD_LENGTH, 'Password must be at least 4 characters'),
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+  password: z.string().min(4, 'Password must be at least 4 characters'),
+  autoApprove: z.boolean().optional().default(false),
 })
 
 export type CreateEventInput = z.infer<typeof createEventSchema>
