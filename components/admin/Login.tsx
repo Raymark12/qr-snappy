@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Box,
   Button,
@@ -11,7 +10,7 @@ import {
   Container,
   TextField,
   Typography,
-  Alert
+  Alert,
 } from '@mui/material'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { useLogin } from '@/hooks/useAuth'
@@ -33,17 +32,16 @@ export const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  
-  const router = useRouter()
+
   const loginMutation = useLogin()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     try {
       await loginMutation.mutateAsync({ email, password })
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     }
@@ -93,7 +91,7 @@ export const Login = () => {
                 label="Email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={e => setEmail(e.target.value)}
                 required
                 fullWidth
                 variant="outlined"
@@ -104,7 +102,7 @@ export const Login = () => {
                 label="Password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 required
                 fullWidth
                 variant="outlined"
