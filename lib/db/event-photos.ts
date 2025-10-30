@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import type { Photo } from '@/types'
+import type { Photo, PhotoInsert } from '@/types'
 
 export type InsertPhotoParams = {
   eventId: string
@@ -10,6 +10,8 @@ export type InsertPhotoParams = {
   comment?: string | null
   status?: 'pending' | 'approved'
 }
+
+export type PhotoCreateData = Omit<PhotoInsert, 'id' | 'uploaded_at' | 'reviewed_at' | 'reviewed_by'>
 
 export async function getEventPhotos(eventId: string, includePendingForModerator = false): Promise<Photo[]> {
   const supabase = await createServerSupabaseClient()
@@ -57,7 +59,7 @@ export async function getEventPhotos(eventId: string, includePendingForModerator
   const { data: photosData, error: fetchError } = await query
 
   if (fetchError) {
-    console.error('Error fetching photos:', fetchError)
+    console.error('Error fetching photos:', fetchError, 'eventId:', eventId)
     return []
   }
 
@@ -69,7 +71,7 @@ export async function insertPhotoRow(params: InsertPhotoParams): Promise<{ succe
 
   const { data: photoData, error: insertError } = await supabase
     .from('photos')
-    // @ts-expect-error - Supabase generated types may not include author/comment yet
+    // @ts-expect-error - Supabase types complexity
     .insert({
       event_id: params.eventId,
       user_email: params.userEmail,
@@ -83,7 +85,7 @@ export async function insertPhotoRow(params: InsertPhotoParams): Promise<{ succe
     .single<{ id: string }>()
 
   if (insertError) {
-    console.error('Error inserting photo row:', insertError)
+    console.error('Error inserting photo row:', insertError, 'eventId:', params.eventId)
     return { success: false, error: 'Failed to save photo metadata' }
   }
 
@@ -108,7 +110,7 @@ export async function updatePhotoStatus(
     .eq('id', photoId)
 
   if (error) {
-    console.error('Error updating photo status:', error)
+    console.error('Error updating photo status:', error, 'photoId:', photoId, 'status:', status, 'reviewedBy:', reviewedBy)
     return { success: false, error: 'Failed to update photo status' }
   }
 
@@ -125,7 +127,7 @@ export async function getPhotoById(photoId: string): Promise<Photo | null> {
     .single<Photo>()
 
   if (error) {
-    console.error('Error fetching photo:', error)
+    console.error('Error fetching photo:', error, 'photoId:', photoId)
     return null
   }
 
@@ -146,7 +148,7 @@ export async function deletePhoto(photoId: string): Promise<{ success: boolean; 
     .eq('id', photoId)
 
   if (error) {
-    console.error('Error deleting photo:', error)
+    console.error('Error deleting photo:', error, 'photoId:', photoId)
     return { success: false, error: 'Failed to delete photo' }
   }
 
