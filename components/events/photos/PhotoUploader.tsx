@@ -6,6 +6,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import { useUploadPhoto } from '@/hooks/usePhotos'
 import { FILE_UPLOAD, UI } from '@/lib/constants'
 import { useToastStore } from '@/stores/toastStore'
+import { useAuth } from '@/hooks/useAuth'
 import PhotoPreviewModal, { type PhotoPreviewItem } from './PhotoPreviewModal'
 
 type UploadItem = {
@@ -35,7 +36,12 @@ export default function PhotoUploader({
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(
     null
   )
-  const uploadMutation = useUploadPhoto(eventId, publicMode)
+  const { user } = useAuth()
+  const uploadMutation = useUploadPhoto(eventId, publicMode, progress => {
+    setUploadProgress(prev =>
+      prev ? { ...prev, current: progress } : { current: progress, total: 100 }
+    )
+  })
   const showToast = useToastStore(state => state.showToast)
 
   useEffect(() => {
@@ -221,13 +227,15 @@ export default function PhotoUploader({
         onUpload={handlePreviewUpload}
         onUpdatePhoto={handleUpdatePhoto}
         onRemovePhoto={handleRemovePhoto}
+        userEmail={user?.email}
+        publicMode={publicMode}
       />
 
       <Box sx={{ p: 0 }}>
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           hidden
           onChange={e => onFilesSelected(e.target.files)}
@@ -242,10 +250,10 @@ export default function PhotoUploader({
               sx={{ textTransform: 'none', width: { xs: '100%', md: 'auto' } }}
               disabled={activeUploads.length > 0}
             >
-              {activeUploads.length > 0 ? 'Uploading...' : 'Upload photos'}
+              {activeUploads.length > 0 ? 'Uploading...' : 'Upload photos & videos'}
             </Button>
             <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-              Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per image •{' '}
+              Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per file •{' '}
               {FILE_UPLOAD.ALLOWED_EXTENSIONS.join(', ')}
             </Typography>
           </Box>
@@ -285,10 +293,10 @@ export default function PhotoUploader({
               sx={{ textTransform: 'none' }}
               disabled={activeUploads.length > 0}
             >
-              Select images
+              Select files
             </Button>
             <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
-              Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per image •{' '}
+              Max {FILE_UPLOAD.MAX_SIZE_DISPLAY} per file •{' '}
               {FILE_UPLOAD.ALLOWED_EXTENSIONS.join(', ')}
             </Typography>
 
