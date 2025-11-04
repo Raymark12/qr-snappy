@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createMetadata } from '@/lib/metadata'
 import { getEventById } from '@/lib/db/events'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/utils/auth-helpers'
 import AdminLayout from '@/components/global/AdminLayout'
 import EventDetails from '@/components/events/details/EventDetails'
 import EventNotAvailable from '@/components/events/common/EventNotAvailable'
@@ -33,10 +35,25 @@ export async function generateMetadata({ params }: EventDetailsPageProps): Promi
 
 export default async function EventDetailsPage({ params }: EventDetailsPageProps) {
   const { eventId } = await params
-  const event = await getEventById(eventId)
 
-  if (!event) {
+  // Server-side authentication check
+  const supabase = await createServerSupabaseClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const authResult = await requireAuth(supabase as any)
+
+  if ('error' in authResult) {
+    redirect('/login?redirected=true')
+  }
+
+  const eventData = await getEventById(eventId)
+
+  if (!eventData) {
     notFound()
+  }
+
+  const event = {
+    ...eventData,
+    auto_approve: eventData.auto_approve ?? false,
   }
 
   if (!event.is_active) {

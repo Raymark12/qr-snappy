@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -15,32 +15,41 @@ import {
 import { Warning as WarningIcon } from '@mui/icons-material'
 import { deleteEvent } from '@/lib/actions/events'
 import { useRouter } from 'next/navigation'
-import type { EventWithDetails } from '@/types'
+import { useToastStore } from '@/stores/toastStore'
+import type { Event } from '@/types'
 
 interface DeleteEventDialogProps {
-  event: EventWithDetails
+  event: Pick<Event, 'id' | 'title'>
   open: boolean
   onClose: () => void
 }
 
 export default function DeleteEventDialog({ event, open, onClose }: DeleteEventDialogProps) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const showToast = useToastStore(state => state.showToast)
+  const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState('')
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     setError('')
+    setIsPending(true)
 
-    startTransition(async () => {
+    try {
       const result = await deleteEvent(event.id)
 
       if (result.success) {
+        showToast(`Event "${event.title}" deleted successfully`, 'success')
         onClose()
         router.refresh()
       } else {
         setError(result.error || 'Failed to delete event')
       }
-    })
+    } catch (error) {
+      console.error('Delete event error:', error)
+      setError('Failed to delete event')
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (

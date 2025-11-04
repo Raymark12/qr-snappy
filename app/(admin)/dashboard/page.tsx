@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createMetadata } from '@/lib/metadata'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/utils/auth-helpers'
+import { requireAuth } from '@/lib/utils/auth-helpers'
 import { redirect } from 'next/navigation'
 import DashboardComponent from '@/components/admin/DashboardComponent'
 import { getUsers } from '@/lib/db/users'
@@ -18,7 +18,7 @@ export const metadata: Metadata = createMetadata({
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const authResult = await requireAdmin(supabase as any)
+  const authResult = await requireAuth(supabase as any)
 
   if ('error' in authResult) {
     redirect('/login')

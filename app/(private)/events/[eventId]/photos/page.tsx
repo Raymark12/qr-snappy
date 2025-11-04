@@ -53,7 +53,6 @@ export default async function EventPhotosPage({ params }: EventPhotosPageProps) 
     hasAccess = isUserAdmin || isAssigned
   }
 
-  // Shows event only for users with access if the event is inactive
   if (!event.is_active && !hasAccess) {
     return (
       <AdminLayout>
