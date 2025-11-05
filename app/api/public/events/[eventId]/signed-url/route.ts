@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseAdmin } from '@/lib/supabase/client'
 import { STORAGE } from '@/lib/constants'
 import { env } from '@/lib/env'
+import { getR2SignedUrl, generateR2Key } from '@/lib/utils/r2-storage'
 import crypto from 'crypto'
 
 export const runtime = 'nodejs'
@@ -52,23 +52,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    // Generate signed URL using admin client
-    const adminClient = createSupabaseAdmin()
+    // Generate signed URL using R2
     let pathInBucket = filePath
-    if (filePath.startsWith(`${STORAGE.BUCKET_NAME}/`)) {
+
+    const r2BucketName = env.R2_BUCKET_NAME
+    if (r2BucketName && filePath.startsWith(`${r2BucketName}/`)) {
+      pathInBucket = filePath.replace(`${r2BucketName}/`, '')
+    } else if (filePath.startsWith(`${STORAGE.BUCKET_NAME}/`)) {
       pathInBucket = filePath.replace(`${STORAGE.BUCKET_NAME}/`, '')
     }
 
-    const { data, error } = await adminClient.storage
-      .from(STORAGE.BUCKET_NAME)
-      .createSignedUrl(pathInBucket, STORAGE.SIGNED_URL_EXPIRY)
+    const r2Key = generateR2Key(pathInBucket)
+    const result = await getR2SignedUrl(r2Key, STORAGE.SIGNED_URL_EXPIRY)
 
-    if (error || !data) {
-      console.error('Failed to create signed URL:', error, 'for path:', pathInBucket)
+    if (!result.success || !result.url) {
+      console.error('Failed to create signed URL:', result.error, 'for path:', pathInBucket)
       return NextResponse.json({ error: 'Failed to create signed URL' }, { status: 500 })
     }
 
-    return NextResponse.json({ url: data.signedUrl })
+    return NextResponse.json({ url: result.url })
   } catch (err) {
     console.error('Signed URL error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
-import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/utils/storage'
+import { uploadFileToStorage, deleteFileFromStorage, normalizeStoragePath } from '@/lib/utils/storage'
 import { requireEventAccess } from '@/lib/utils/auth-helpers'
-import { validateFile, getPhotoStoragePath } from '@/lib/utils/file-validation'
+import { validateFile, getMediaStoragePath } from '@/lib/utils/file-validation'
 import { eventIdParamSchema } from '@/lib/validations'
 import { getEventPhotos, insertPhotoRow } from '@/lib/db/event-photos'
 
@@ -47,6 +47,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase client type complexity with RLS policies
     const authResult = await requireEventAccess(supabase as any, eventId)
 
+    // Get event details to check auto-approve setting
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: event } = await (supabase as any)
+      .from('events')
+      .select('auto_approve')
+      .eq('id', eventId)
+      .single()
+
+    const shouldAutoApprove = event?.auto_approve || false
+
     if ('error' in authResult) {
       return authResult.error
     }
@@ -68,7 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     }
 
     const originalName = file.name
-    bucketPath = getPhotoStoragePath(eventId, originalName)
+    bucketPath = getMediaStoragePath(eventId, originalName)
 
     const uploadResult = await uploadFileToStorage(bucketPath, file)
     if (!uploadResult.success) {
@@ -82,14 +92,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
       fileName: originalName,
       author: author || undefined,
       comment: comment || undefined,
-      status: 'pending',
+      status: shouldAutoApprove ? 'approved' : 'pending',
     })
 
     if (!insertResult.success) {
       console.error('Error inserting photo row:', insertResult.error)
 
       if (bucketPath) {
-        await deleteFileFromStorage(bucketPath)
+        const fullPath = normalizeStoragePath(bucketPath)
+        await deleteFileFromStorage(fullPath)
       }
 
       return NextResponse.json({

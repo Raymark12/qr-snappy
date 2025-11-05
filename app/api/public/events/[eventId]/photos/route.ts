@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createSupabaseAdmin } from '@/lib/supabase/client'
-import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/utils/storage'
-import { validateFile, getPhotoStoragePath } from '@/lib/utils/file-validation'
+import { uploadFileToStorage, deleteFileFromStorage, normalizeStoragePath } from '@/lib/utils/storage'
+import { validateFile, getMediaStoragePath } from '@/lib/utils/file-validation'
 import { eventIdParamSchema } from '@/lib/validations'
 import { getEventById } from '@/lib/db/events'
 
@@ -71,6 +71,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
       return NextResponse.json({ error: 'Event is not active' }, { status: 403 })
     }
 
+    const shouldAutoApprove = event.auto_approve || false
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     if (!file) {
@@ -86,7 +88,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     }
 
     const originalName = file.name
-    bucketPath = getPhotoStoragePath(eventId, originalName)
+    bucketPath = getMediaStoragePath(eventId, originalName)
 
     // Use admin client to upload and insert (bypasses RLS)
     const adminClient = createSupabaseAdmin()
@@ -105,7 +107,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
         file_name: originalName,
         author: author || null,
         comment: comment || null,
-        status: 'pending',
+        status: shouldAutoApprove ? 'approved' : 'pending',
       })
       .select('id')
       .single<{ id: string }>()
@@ -114,7 +116,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
       console.error('Error inserting photo row:', insertError)
 
       if (bucketPath) {
-        await deleteFileFromStorage(bucketPath)
+        const fullPath = normalizeStoragePath(bucketPath)
+        await deleteFileFromStorage(fullPath)
       }
 
       return NextResponse.json({
