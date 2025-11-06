@@ -11,21 +11,18 @@ import {
   Box,
   Chip,
   CircularProgress,
-  IconButton,
-  Tooltip,
 } from '@mui/material'
 import {
   Lock as LockIcon,
   CalendarToday as CalendarIcon,
-  Block as BlockIcon,
-  CheckCircle as CheckCircleIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material'
 import type { Event } from '@/types'
 import EventPasswordDialog from '@/components/events/dialogs/EventPasswordDialog'
+import DeleteEventDialog from '@/components/events/dialogs/DeleteEventDialog'
 import { format } from 'date-fns'
-import { apiGet, apiPatch } from '@/lib/utils/api-client'
+import { apiGet } from '@/lib/utils/api-client'
 import { useIsAdmin, useIsEventModerator } from '@/hooks/useAuth'
-import { useToastStore } from '@/stores/toastStore'
 
 interface EventCardProps {
   event: Event
@@ -33,15 +30,12 @@ interface EventCardProps {
 
 export default function EventCard({ event }: EventCardProps) {
   const router = useRouter()
-  const showToast = useToastStore(state => state.showToast)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [checkingAccess, setCheckingAccess] = useState(false)
-  const [toggling, setToggling] = useState(false)
-  const [optimisticActive, setOptimisticActive] = useState<boolean | null>(null)
+
   const isAdmin = useIsAdmin()
   const isModerator = useIsEventModerator(event.id)
-
-  const displayIsActive = optimisticActive !== null ? optimisticActive : event.is_active
 
   const handleAccessClick = async () => {
     const isAuthorized = isAdmin || isModerator
@@ -60,37 +54,6 @@ export default function EventCard({ event }: EventCardProps) {
       }
     }
     setDialogOpen(true)
-  }
-
-  const handleToggleActive = async () => {
-    const newActiveState = !displayIsActive
-
-    setOptimisticActive(newActiveState)
-    setToggling(true)
-
-    try {
-      const result = await apiPatch<{ success: boolean; error?: string }>(
-        `/api/events/${event.id}/toggle-active`,
-        { isActive: newActiveState }
-      )
-
-      if (result.success) {
-        showToast(`Event ${newActiveState ? 'activated' : 'deactivated'} successfully`, 'success')
-        setOptimisticActive(null)
-        router.refresh()
-      } else {
-        setOptimisticActive(null)
-        showToast(result.error || 'Failed to toggle event status. Please try again.', 'error')
-      }
-    } catch (error) {
-      setOptimisticActive(null)
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to toggle event status. Please try again.'
-      showToast(errorMessage, 'error')
-      console.error('Error toggling event active status:', error)
-    } finally {
-      setToggling(false)
-    }
   }
 
   return (
@@ -120,23 +83,21 @@ export default function EventCard({ event }: EventCardProps) {
               {event.title}
             </Typography>
             {isAdmin && (
-              <Tooltip title={displayIsActive ? 'Deactivate Event' : 'Activate Event'}>
-                <IconButton
-                  size="small"
-                  onClick={handleToggleActive}
-                  disabled={toggling}
-                  color={displayIsActive ? 'error' : 'success'}
-                  sx={{ ml: 1 }}
-                >
-                  {toggling ? (
-                    <CircularProgress size={20} />
-                  ) : displayIsActive ? (
-                    <BlockIcon fontSize="small" />
-                  ) : (
-                    <CheckCircleIcon fontSize="small" />
-                  )}
-                </IconButton>
-              </Tooltip>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon fontSize="small" />}
+                onClick={() => setDeleteDialogOpen(true)}
+                sx={{
+                  ml: 1,
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                }}
+              >
+                Delete
+              </Button>
             )}
           </Box>
           {event.description && (
@@ -146,8 +107,8 @@ export default function EventCard({ event }: EventCardProps) {
           )}
           <Box sx={{ mb: 2 }}>
             <Chip
-              label={displayIsActive ? 'Active' : 'Inactive'}
-              color={displayIsActive ? 'success' : 'default'}
+              label={event.is_active ? 'Active' : 'Inactive'}
+              color={event.is_active ? 'success' : 'default'}
               size="small"
               sx={{ fontWeight: 500 }}
             />
@@ -175,12 +136,23 @@ export default function EventCard({ event }: EventCardProps) {
               textTransform: 'none',
             }}
           >
-            {checkingAccess ? <CircularProgress size={24} /> : 'Access Event'}
+            {checkingAccess ? '' : 'Access Event'}
           </Button>
         </CardActions>
       </Card>
 
-      <EventPasswordDialog open={dialogOpen} onClose={() => setDialogOpen(false)} event={event} />
+      <EventPasswordDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSuccess={() => router.push(`/events/${event.id}/photos`)}
+        event={event}
+      />
+
+      <DeleteEventDialog
+        event={event}
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      />
     </>
   )
 }

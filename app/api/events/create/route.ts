@@ -3,6 +3,7 @@ import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { hashPassword } from '@/lib/utils/password-server'
 import { requireAdmin } from '@/lib/utils/auth-helpers'
 import { createEventSchema } from '@/lib/validations'
+import { generateEventQR } from '@/lib/utils/qr-generator'
 import type { Database } from '@/types/database'
 
 /**
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { title, description, password } = validationResult.data
+    const { title, description, password, autoApprove } = validationResult.data
 
     // Require admin authentication
     const supabase = createRouteSupabaseClient(request)
@@ -40,13 +41,14 @@ export async function POST(request: NextRequest) {
     type EventInsert = Database['public']['Tables']['events']['Insert']
     type EventRow = Database['public']['Tables']['events']['Row']
 
-    const insertData: EventInsert = {
+    const insertData = {
       title,
       description: description || null,
       password: hashedPassword,
       admin_id: user.id,
       is_active: true,
-    }
+      auto_approve: autoApprove || false,
+    } as EventInsert
 
     const { data: eventData, error: insertError } = await supabase
       .from('events')
@@ -65,6 +67,13 @@ export async function POST(request: NextRequest) {
 
     const createdEvent = eventData[0]
 
+    // Generate QR code for the new event
+    const qrResult = await generateEventQR(createdEvent.id)
+    if (!qrResult.success) {
+      console.error('Failed to generate QR code for event:', createdEvent.id, qrResult.error)
+      // Don't fail the event creation if QR generation fails
+    }
+
     return NextResponse.json({
       success: true,
       event: {
@@ -74,6 +83,10 @@ export async function POST(request: NextRequest) {
         is_active: createdEvent.is_active,
         created_at: createdEvent.created_at,
       },
+      qr: qrResult.success ? {
+        url: qrResult.url,
+        path: qrResult.path,
+      } : null,
     })
   } catch (error) {
     console.error('Event creation error:', error)

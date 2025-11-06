@@ -11,7 +11,6 @@ import {
   Box,
   Typography,
   Alert,
-  CircularProgress,
 } from '@mui/material'
 import { Lock as LockIcon } from '@mui/icons-material'
 import type { Event } from '@/types'
@@ -20,10 +19,16 @@ import { apiPost } from '@/lib/utils/api-client'
 interface EventPasswordDialogProps {
   open: boolean
   onClose: () => void
+  onSuccess?: () => void
   event: Event
 }
 
-export default function EventPasswordDialog({ open, onClose, event }: EventPasswordDialogProps) {
+export default function EventPasswordDialog({
+  open,
+  onClose,
+  onSuccess,
+  event,
+}: EventPasswordDialogProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
@@ -48,6 +53,7 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
         )
 
         if (data.success) {
+          onSuccess?.()
           onClose()
         } else {
           setError(data.error || 'Invalid password')
@@ -123,7 +129,7 @@ export default function EventPasswordDialog({ open, onClose, event }: EventPassw
           disabled={isPending || !password.trim()}
           sx={{ textTransform: 'none', minWidth: 100 }}
         >
-          {isPending ? <CircularProgress size={24} /> : 'Access'}
+          {isPending ? 'Loading...' : 'Access'}
         </Button>
       </DialogActions>
     </Dialog>

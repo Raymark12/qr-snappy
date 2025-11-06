@@ -12,10 +12,13 @@ import {
   Alert,
   CircularProgress,
   Typography,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material'
 import { Image as ImageIcon } from '@mui/icons-material'
 import { createEvent } from '@/lib/actions/events'
 import { useRouter } from 'next/navigation'
+import { useToastStore } from '@/stores/toastStore'
 
 interface CreateEventDialogProps {
   open: boolean
@@ -24,6 +27,7 @@ interface CreateEventDialogProps {
 
 export default function CreateEventDialog({ open, onClose }: CreateEventDialogProps) {
   const router = useRouter()
+  const showToast = useToastStore(state => state.showToast)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [backgroundImage, setBackgroundImage] = useState<File | null>(null)
@@ -63,10 +67,11 @@ export default function CreateEventDialog({ open, onClose }: CreateEventDialogPr
           }
         }
 
-        onClose()
+        showToast('Event created successfully!', 'success')
         ;(e.target as HTMLFormElement).reset()
         setBackgroundImage(null)
         router.refresh()
+        onClose()
       } else {
         setError(result.error || 'Failed to create event')
       }
@@ -107,6 +112,12 @@ export default function CreateEventDialog({ open, onClose }: CreateEventDialogPr
               helperText="Guests will need this password to upload photos"
               placeholder="Min 4 characters"
               disabled={isPending}
+            />
+
+            <FormControlLabel
+              control={<Checkbox name="autoApprove" defaultChecked={false} disabled={isPending} />}
+              label="Auto-approve media uploads"
+              sx={{ mt: 1 }}
             />
             <Box>
               <input

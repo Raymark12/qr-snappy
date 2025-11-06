@@ -61,7 +61,19 @@ export async function POST(request: NextRequest) {
     const value = `${payload}.${signature}`
 
     const response = NextResponse.json({ success: true, eventId: eventData.id })
-    response.cookies.set(`event_access_${eventData.id}`.toLowerCase(), value, {
+
+    // Clear cookies before setting the new one
+    const cookieName = `event_access_${eventData.id}`.toLowerCase()
+    response.cookies.set(cookieName, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    })
+
+    // Set the new access cookie
+    response.cookies.set(cookieName, value, {
       httpOnly: true,
       sameSite: 'lax',
       secure: env.NODE_ENV === 'production',
