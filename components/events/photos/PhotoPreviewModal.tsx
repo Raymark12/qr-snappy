@@ -37,6 +37,8 @@ interface PhotoPreviewModalProps {
   onUpload: (photos: PhotoPreviewItem[]) => void
   onUpdatePhoto: (id: string, updates: Partial<PhotoPreviewItem>) => void
   onRemovePhoto: (id: string) => void
+  userEmail?: string | null
+  publicMode?: boolean
 }
 
 export default function PhotoPreviewModal({
@@ -46,13 +48,15 @@ export default function PhotoPreviewModal({
   onUpload,
   onUpdatePhoto,
   onRemovePhoto,
+  userEmail,
+  publicMode = false,
 }: PhotoPreviewModalProps) {
   const [globalAuthor, setGlobalAuthor] = useState('')
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set())
 
   const handleApplyAuthorToAll = () => {
     if (globalAuthor.trim()) {
-      photos.forEach((photo) => {
+      photos.forEach(photo => {
         onUpdatePhoto(photo.id, { author: globalAuthor.trim() })
       })
     }
@@ -66,7 +70,7 @@ export default function PhotoPreviewModal({
   const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2)
 
   const handleImageLoad = (photoId: string) => {
-    setLoadingImages((prev) => {
+    setLoadingImages(prev => {
       const newSet = new Set(prev)
       newSet.delete(photoId)
       return newSet
@@ -74,7 +78,7 @@ export default function PhotoPreviewModal({
   }
 
   const handleImageLoadStart = (photoId: string) => {
-    setLoadingImages((prev) => new Set(prev).add(photoId))
+    setLoadingImages(prev => new Set(prev).add(photoId))
   }
 
   return (
@@ -93,6 +97,16 @@ export default function PhotoPreviewModal({
 
       <DialogContent dividers>
         <Box sx={{ mb: 3, p: 2, borderRadius: 1 }}>
+          {userEmail && !publicMode && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                Uploaded by
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {userEmail}
+              </Typography>
+            </Box>
+          )}
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
             Quick Fill: Author Name
           </Typography>
@@ -101,7 +115,7 @@ export default function PhotoPreviewModal({
               size="small"
               placeholder="Enter your name..."
               value={globalAuthor}
-              onChange={(e) => setGlobalAuthor(e.target.value)}
+              onChange={e => setGlobalAuthor(e.target.value)}
               fullWidth
             />
             <Button
@@ -116,7 +130,7 @@ export default function PhotoPreviewModal({
         </Box>
 
         <Grid container spacing={2}>
-          {photos.map((photo) => (
+          {photos.map(photo => (
             <Grid item xs={12} sm={6} md={4} key={photo.id}>
               <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ position: 'relative' }}>
@@ -172,7 +186,7 @@ export default function PhotoPreviewModal({
                     label="Author (optional)"
                     placeholder="Your name..."
                     value={photo.author || ''}
-                    onChange={(e) => onUpdatePhoto(photo.id, { author: e.target.value })}
+                    onChange={e => onUpdatePhoto(photo.id, { author: e.target.value })}
                     fullWidth
                     sx={{ mb: 1 }}
                   />
@@ -181,7 +195,7 @@ export default function PhotoPreviewModal({
                     label="Comment (optional)"
                     placeholder="Add a comment..."
                     value={photo.comment || ''}
-                    onChange={(e) => onUpdatePhoto(photo.id, { comment: e.target.value })}
+                    onChange={e => onUpdatePhoto(photo.id, { comment: e.target.value })}
                     fullWidth
                     multiline
                     rows={2}

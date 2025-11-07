@@ -8,7 +8,9 @@ import {
   Event as EventIcon,
   PhotoLibrary as PhotoIcon,
   People as PeopleIcon,
+  Storage as StorageIcon,
 } from '@mui/icons-material'
+import { formatBytes } from '@/lib/utils/format'
 import UsersComponent from './UsersComponent'
 import type { UserWithAssignments } from '@/lib/db/users'
 import type { EventWithDetails } from '@/types'
@@ -38,10 +40,26 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
         </Typography>
       </Box>
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Total Events
@@ -64,10 +82,26 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Photos
@@ -91,10 +125,26 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Total Users
@@ -117,13 +167,82 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
             </CardContent>
           </Card>
         </Grid>
+
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
+                <Box>
+                  <Typography color="text.secondary" variant="body2" gutterBottom>
+                    Storage Files
+                  </Typography>
+                  <Typography variant="h4" fontWeight={700}>
+                    {stats.storageError ? 'Error' : stats.storageObjectsCount.toLocaleString()}
+                  </Typography>
+                  {stats.storageError && (
+                    <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                      Check R2 config
+                    </Typography>
+                  )}
+                  {!stats.storageError && stats.storageUsedBytes > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {formatBytes(stats.storageUsedBytes)}
+                    </Typography>
+                  )}
+                </Box>
+                <Box
+                  sx={{
+                    bgcolor: 'secondary.main',
+                    color: 'secondary.contrastText',
+                    p: 1.5,
+                    borderRadius: 2,
+                  }}
+                >
+                  <StorageIcon />
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Active Events
@@ -146,10 +265,26 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Pending Photos
@@ -172,10 +307,26 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Admins
@@ -198,10 +349,26 @@ export default function DashboardComponent({ users, events, stats }: DashboardCo
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card
+            elevation={0}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              height: '100%',
+              minHeight: { xs: 80, sm: 90 },
+              aspectRatio: { xs: '1/1', sm: 'auto' },
+            }}
+          >
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexGrow: 1,
+                }}
+              >
                 <Box>
                   <Typography color="text.secondary" variant="body2" gutterBottom>
                     Clients

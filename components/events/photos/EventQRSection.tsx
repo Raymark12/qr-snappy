@@ -8,9 +8,12 @@ import {
   Image as ImageIcon,
   Wallpaper as WallpaperIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material'
 import { apiGet } from '@/lib/utils/api-client'
-import { getAuthenticatedImageUrl } from '@/lib/utils/storage'
+import { getImageUrl } from '@/lib/actions/image-url'
+import { useIsEventModerator, useIsAdmin, useAuth } from '@/hooks/useAuth'
+import EventEditDialog from '@/components/events/dialogs/EventEditDialog'
 
 interface EventQRSectionProps {
   eventId: string
@@ -18,6 +21,15 @@ interface EventQRSectionProps {
   eventDescription?: string | null
   backgroundImagePath?: string | null
   publicMode?: boolean
+  event?: {
+    id: string
+    title: string
+    description?: string | null
+    is_active: boolean
+    background_image_path?: string | null
+    password?: string
+  }
+  onEventUpdate?: () => void
 }
 
 export default function EventQRSection({
@@ -26,15 +38,29 @@ export default function EventQRSection({
   eventDescription,
   backgroundImagePath,
   publicMode = false,
+  event,
+  onEventUpdate,
 }: EventQRSectionProps) {
   const [loading, setLoading] = useState(false)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+
+  const isModerator = useIsEventModerator(eventId)
+  const isAdmin = useIsAdmin()
+  const { user } = useAuth()
+  const isClient = user?.role === 'client'
+  const canEdit = isAdmin || isModerator || isClient
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null)
   const [backgroundLoading, setBackgroundLoading] = useState(false)
+  const [origin, setOrigin] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const backgroundInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
 
   const fetchExisting = async () => {
     try {
@@ -49,7 +75,6 @@ export default function EventQRSection({
       }
     } catch (err) {
       setQrUrl(null)
-      setError('Failed to load QR code')
       console.error('Failed to fetch QR:', err)
     } finally {
       setLoading(false)
@@ -66,7 +91,7 @@ export default function EventQRSection({
       if (backgroundImagePath) {
         try {
           setBackgroundLoading(true)
-          const url = await getAuthenticatedImageUrl(backgroundImagePath, {
+          const url = await getImageUrl(backgroundImagePath, {
             publicMode,
             eventId,
           })
@@ -269,7 +294,7 @@ export default function EventQRSection({
               </Box>
             )}
             {qrUrl && (
-              <Box sx={{ mb: 2 }}>
+              <Box sx={{ mb: 2, textAlign: 'center' }}>
                 <Image
                   key={refreshKey} // Force remount on refresh
                   src={qrUrl}
@@ -284,6 +309,114 @@ export default function EventQRSection({
                     setError('Failed to load QR image')
                   }}
                 />
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      mb: 1,
+                      color: 'grey.400',
+                      fontWeight: 500,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Share this link:
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: { xs: 'block', sm: 'flex' },
+                      alignItems: { sm: 'center' },
+                      gap: { sm: 0.5 },
+                      p: 1.5,
+                      bgcolor: 'grey.900',
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'grey.700',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      transition: 'all 0.2s ease-in-out',
+                      overflow: 'hidden',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      },
+                    }}
+                  >
+                    {/* Mobile: URL in separate section with border */}
+                    <Box
+                      sx={{
+                        display: { xs: 'block', sm: 'none' },
+                        pb: 1,
+                        mb: 1,
+                        borderBottom: '1px solid',
+                        borderBottomColor: 'grey.700',
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'JetBrains Mono, monospace',
+                          wordBreak: 'break-all',
+                          color: 'grey.100',
+                          fontSize: '0.8rem',
+                          letterSpacing: '0.025em',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {origin ? `${origin}/e/${eventId}` : `/e/${eventId}`}
+                      </Typography>
+                    </Box>
+
+                    {/* Desktop: URL inline, Mobile: Button full width */}
+                    <Box
+                      sx={{
+                        flex: { sm: 1 },
+                        display: { xs: 'none', sm: 'block' },
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'JetBrains Mono, monospace',
+                          wordBreak: 'break-all',
+                          color: 'grey.100',
+                          fontSize: '0.875rem',
+                          letterSpacing: '0.025em',
+                        }}
+                      >
+                        {origin ? `${origin}/e/${eventId}` : `/e/${eventId}`}
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={async () => {
+                        const url = origin ? `${origin}/e/${eventId}` : `/e/${eventId}`
+                        try {
+                          await navigator.clipboard.writeText(url)
+                          // Could add a toast notification here
+                        } catch (err) {
+                          console.error('Failed to copy URL:', err)
+                        }
+                      }}
+                      sx={{
+                        width: { xs: '100%', sm: 'auto' },
+                        minWidth: { sm: 'auto' },
+                        px: { xs: 1.5, sm: 1.5 },
+                        py: { xs: 1, sm: 0.5 },
+                        fontSize: { xs: '0.875rem', sm: '0.75rem' },
+                        fontWeight: 600,
+                        borderRadius: 1,
+                        textTransform: 'none',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        '&:hover': {
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        },
+                      }}
+                    >
+                      Copy Link
+                    </Button>
+                  </Box>
+                </Box>
               </Box>
             )}
             {!qrUrl && !loading && !error && (
@@ -327,6 +460,23 @@ export default function EventQRSection({
           onChange={handleBackgroundSelect}
         />
 
+        {canEdit && !publicMode && (
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={() => setEditDialogOpen(true)}
+            sx={{
+              textTransform: 'none',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(10px)',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              },
+            }}
+          >
+            Edit Event
+          </Button>
+        )}
         {!publicMode && (
           <>
             <Button
@@ -421,6 +571,20 @@ export default function EventQRSection({
           </Button>
         )}
       </Box>
+
+      {/* Event Edit Dialog */}
+      {event && (
+        <EventEditDialog
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          event={event}
+          onSuccess={() => {
+            setEditDialogOpen(false)
+            onEventUpdate?.()
+          }}
+          isAdmin={isAdmin}
+        />
+      )}
     </Paper>
   )
 }

@@ -21,7 +21,6 @@ export default function PublicEventPhotos({ event }: PublicEventPhotosProps) {
   const [showContent, setShowContent] = useState(false)
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
 
-  // Wait for initial load plus a small delay to let images load
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null
 
@@ -102,9 +101,23 @@ export default function PublicEventPhotos({ event }: PublicEventPhotosProps) {
             width: '100%',
           }}
         >
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 4 }}>
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
             Event Photos
           </Typography>
+          <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Auto-approve:
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: event.auto_approve ? 'success.main' : 'warning.main',
+              }}
+            >
+              {event.auto_approve ? 'ON' : 'OFF'}
+            </Typography>
+          </Box>
 
           <ErrorBoundary>
             <Box sx={{ mb: 4 }}>

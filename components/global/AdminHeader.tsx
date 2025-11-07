@@ -9,7 +9,6 @@ import {
   Menu,
   MenuItem,
   ListItemIcon,
-  Divider,
   Box,
   useTheme,
   Breadcrumbs,
@@ -17,9 +16,7 @@ import {
 } from '@mui/material'
 import {
   Menu as MenuIcon,
-  Settings as SettingsIcon,
   Logout as LogoutIcon,
-  Person as PersonIcon,
   NavigateNext as NavigateNextIcon,
 } from '@mui/icons-material'
 import { useState, useTransition } from 'react'
@@ -44,17 +41,16 @@ interface BreadcrumbItem {
 function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const breadcrumbs: BreadcrumbItem[] = []
 
-  // Always start with Dashboard
-  breadcrumbs.push({ label: 'Dashboard', path: '/dashboard' })
-
-  // Parse pathname
   const segments = pathname.split('/').filter(Boolean)
 
   if (segments.length === 0) {
+    breadcrumbs.push({ label: 'Dashboard' })
     return breadcrumbs
   }
 
-  if (segments[0] === 'events') {
+  if (segments[0] === 'dashboard') {
+    breadcrumbs.push({ label: 'Dashboard' })
+  } else if (segments[0] === 'events') {
     breadcrumbs.push({ label: 'Events', path: '/events' })
 
     if (segments.length > 1) {
@@ -63,12 +59,6 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
       } else if (segments.length === 3 && segments[2] === 'photos') {
         breadcrumbs.push({ label: 'Photos' })
       }
-    }
-  } else if (segments[0] === 'dashboard' && segments.length > 1) {
-    if (segments[1] === 'profile') {
-      breadcrumbs.push({ label: 'Profile' })
-    } else if (segments[1] === 'settings') {
-      breadcrumbs.push({ label: 'Settings' })
     }
   }
 
@@ -94,19 +84,16 @@ export default function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
     setAnchorEl(null)
   }
 
-  const handleNavigation = (path: string) => {
-    router.push(path)
-    handleUserMenuClose()
-  }
-
   const handleLogout = () => {
     handleUserMenuClose()
     startTransition(async () => {
       try {
         await logoutAction()
       } catch (error) {
-        if (error instanceof Error && error.message !== 'NEXT_REDIRECT') {
-          console.error('Logout error:', error)
+        if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+          console.log('Server logout completed with redirect, client state will be cleared')
+        } else {
+          console.warn('Server logout failed, trying client logout:', error)
         }
       }
     })
@@ -235,19 +222,6 @@ export default function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
             {user?.role || 'Admin'}
           </Typography>
         </Box>
-        <MenuItem onClick={() => handleNavigation('/dashboard/profile')}>
-          <ListItemIcon>
-            <PersonIcon fontSize="small" />
-          </ListItemIcon>
-          Profile
-        </MenuItem>
-        <MenuItem onClick={() => handleNavigation('/dashboard/settings')}>
-          <ListItemIcon>
-            <SettingsIcon fontSize="small" />
-          </ListItemIcon>
-          Settings
-        </MenuItem>
-        <Divider />
         <MenuItem onClick={handleLogout} disabled={isPending}>
           <ListItemIcon>
             <LogoutIcon fontSize="small" />

@@ -6,17 +6,19 @@ import Image from 'next/image'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import DownloadIcon from '@mui/icons-material/Download'
 import DeleteIcon from '@mui/icons-material/Delete'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import type { Photo } from '@/types'
-import { getAuthenticatedImageUrl } from '@/lib/utils/storage'
-import { useIsEventModerator } from '@/hooks/useAuth'
+import { getImageUrl } from '@/lib/actions/image-url'
+import { useIsEventModerator, useIsAdmin } from '@/hooks/useAuth'
 import { usePhotoActions } from '@/hooks/usePhotoActions'
+import { isVideoFileName } from '@/lib/utils/file-validation'
 import ConfirmDialog from './ConfirmDialog'
 
 interface PhotoItemProps {
   photo: Photo
   eventId: string
   onClick?: () => void
-  priority?: boolean // For LCP optimization - set on first image above the fold
+  priority?: boolean
   publicMode?: boolean
 }
 
@@ -33,8 +35,10 @@ export default function PhotoItem({
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [confirmDialogType, setConfirmDialogType] = useState<'reject' | 'delete'>('reject')
   const isModerator = useIsEventModerator(eventId)
-  const showApproveReject = isModerator && photo.status === 'pending'
-  const showDelete = isModerator
+  const isAdmin = useIsAdmin()
+  const canModerate = isModerator || isAdmin
+  const showApproveReject = canModerate && photo.status === 'pending'
+  const showDelete = canModerate
 
   const { approvePhoto, rejectPhoto, deletePhoto } = usePhotoActions(eventId)
 
@@ -42,6 +46,8 @@ export default function PhotoItem({
     () => photo.file_path && photo.file_path !== '',
     [photo.file_path]
   )
+
+  const isVideo = useMemo(() => isVideoFileName(photo.file_name), [photo.file_name])
 
   const stopEventPropagation = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
@@ -62,7 +68,7 @@ export default function PhotoItem({
 
     let cancelled = false
 
-    getAuthenticatedImageUrl(photo.file_path, { publicMode, eventId })
+    getImageUrl(photo.file_path, { publicMode, eventId })
       .then(url => {
         if (!cancelled) {
           setImageUrl(url)
@@ -88,7 +94,7 @@ export default function PhotoItem({
       return
     }
     try {
-      const url = await getAuthenticatedImageUrl(photo.file_path, { publicMode, eventId })
+      const url = await getImageUrl(photo.file_path, { publicMode, eventId })
       const response = await fetch(url)
       const blob = await response.blob()
       const blobUrl = URL.createObjectURL(blob)
@@ -234,27 +240,72 @@ export default function PhotoItem({
           }
         }}
       >
-        <Image
-          src={imageUrl}
-          alt="Event photo"
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-          style={{
-            objectFit: 'cover',
-            transition: 'transform 0.3s ease-out',
-            willChange: 'transform',
-          }}
-          className="image"
-          unoptimized
-          priority={priority}
-          onError={() => {
-            console.error('Failed to load image:', imageUrl)
-            setImageError(true)
-          }}
-        />
+        {isVideo ? (
+          <video
+            src={imageUrl || undefined}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transition: 'transform 0.3s ease-out',
+              willChange: 'transform',
+            }}
+            className="image"
+            muted
+            playsInline
+            onLoadedData={() => setLoading(false)}
+            onError={() => {
+              console.error('Failed to load video:', imageUrl)
+              setImageError(true)
+              setLoading(false)
+            }}
+          />
+        ) : (
+          <Image
+            src={imageUrl}
+            alt="Event photo"
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+            style={{
+              objectFit: 'cover',
+              transition: 'transform 0.3s ease-out',
+              willChange: 'transform',
+            }}
+            className="image"
+            unoptimized
+            priority={priority}
+            onLoad={() => setLoading(false)}
+            onError={() => {
+              console.error('Failed to load image:', imageUrl)
+              setImageError(true)
+              setLoading(false)
+            }}
+          />
+        )}
+
+        {isVideo && (
+          <Box
+            className="video-overlay"
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(0, 0, 0, 0.3)',
+              opacity: 0,
+              transition: 'opacity 0.3s ease-out',
+              '&:hover': {
+                opacity: 1,
+              },
+            }}
+          >
+            <PlayArrowIcon sx={{ fontSize: 48, color: 'white' }} />
+          </Box>
+        )}
       </Box>
       {hasValidFilePath && (
-        <Tooltip title="Download photo" placement="top">
+        <Tooltip title={`Download ${isVideo ? 'video' : 'photo'}`} placement="top">
           <IconButton
             onClick={e => {
               stopEventPropagation(e)

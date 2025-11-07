@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import Lightbox from 'yet-another-react-lightbox'
+import Lightbox, { Slide } from 'yet-another-react-lightbox'
 import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import Captions from 'yet-another-react-lightbox/plugins/captions'
 import Counter from 'yet-another-react-lightbox/plugins/counter'
+import Video from 'yet-another-react-lightbox/plugins/video'
 import 'yet-another-react-lightbox/styles.css'
 import 'yet-another-react-lightbox/plugins/captions.css'
 import 'yet-another-react-lightbox/plugins/counter.css'
@@ -15,6 +16,7 @@ import {
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material'
 import type { Photo } from '@/types'
+import { isVideoFileName } from '@/lib/utils/file-validation'
 
 function createSlideToPhotoIndexMap(photos: Photo[]): Map<number, number> {
   const map = new Map<number, number>()
@@ -45,13 +47,7 @@ export default function PhotoGallery({
   onIndexChange,
   getImageUrl,
 }: PhotoGalleryProps) {
-  const [slides, setSlides] = useState<
-    Array<{
-      src: string
-      title: string
-      description: string | React.ReactNode
-    }>
-  >([])
+  const [slides, setSlides] = useState<Slide[]>([])
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
 
@@ -73,6 +69,7 @@ export default function PhotoGallery({
           }
 
           const url = await getImageUrl(photo.file_path)
+          const isVideo = isVideoFileName(photo.file_name)
 
           const descriptionParts: React.ReactNode[] = []
           if (photo.author) {
@@ -115,14 +112,34 @@ export default function PhotoGallery({
               </Typography>
             </Box>
           )
-          return {
-            src: url,
-            title: '',
-            description: (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                {descriptionParts}
-              </Box>
-            ),
+
+          if (isVideo) {
+            return {
+              type: 'video' as const,
+              sources: [
+                {
+                  src: url,
+                  type: 'video/mp4',
+                },
+              ],
+              title: '',
+              description: (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  {descriptionParts}
+                </Box>
+              ),
+            }
+          } else {
+            return {
+              type: 'image' as const,
+              src: url,
+              title: '',
+              description: (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  {descriptionParts}
+                </Box>
+              ),
+            }
           }
         })
       )
@@ -201,7 +218,7 @@ export default function PhotoGallery({
         close={onClose}
         index={currentIndex}
         slides={slides}
-        plugins={[Zoom, Captions, Counter]}
+        plugins={[Zoom, Captions, Counter, Video]}
         captions={{
           descriptionTextAlign: 'center',
           descriptionMaxLines: 3,
@@ -219,6 +236,11 @@ export default function PhotoGallery({
         }}
         controller={{
           closeOnBackdropClick: true,
+        }}
+        video={{
+          controls: true,
+          muted: false,
+          autoPlay: false,
         }}
         on={{
           view: ({ index }) => {

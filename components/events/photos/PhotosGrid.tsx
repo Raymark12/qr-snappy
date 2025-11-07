@@ -6,7 +6,7 @@ import { Box, Typography } from '@mui/material'
 import type { Photo } from '@/types'
 import PhotoItem from './PhotoItem'
 import PhotoGallery from './PhotoGallery'
-import { getAuthenticatedImageUrl } from '@/lib/utils/storage'
+import { getImageUrl } from '@/lib/actions/image-url'
 
 interface PhotosGridProps {
   photos: Photo[]
@@ -20,7 +20,6 @@ export default function PhotosGrid({ photos, eventId, publicMode = false }: Phot
   const searchParams = useSearchParams()
   const photoIndexParam = searchParams.get('photo')
 
-  // Parse and validate photo index from URL
   const selectedIndex = useMemo(() => {
     if (photoIndexParam === null) return 0
     const index = parseInt(photoIndexParam, 10)
@@ -122,7 +121,7 @@ export default function PhotosGrid({ photos, eventId, publicMode = false }: Phot
         open={galleryOpen}
         onClose={closeGallery}
         onIndexChange={handleIndexChange}
-        getImageUrl={(path: string) => getAuthenticatedImageUrl(path, { publicMode, eventId })}
+        getImageUrl={(path: string) => getImageUrl(path, { publicMode, eventId })}
       />
     </>
   )

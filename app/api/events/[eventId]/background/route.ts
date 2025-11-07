@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
-import { createSupabaseAdmin } from '@/lib/supabase/client'
 import { requireEventModerator } from '@/lib/utils/auth-helpers'
 import { STORAGE } from '@/lib/constants'
+import { env } from '@/lib/env'
 import { validateFile } from '@/lib/utils/file-validation'
+import { getR2SignedUrl, uploadFileToR2, deleteFileFromR2, generateR2Key } from '@/lib/utils/r2-storage'
 
 export const runtime = 'nodejs'
 
 function getBackgroundStoragePath(eventId: string) {
-  return `${STORAGE.BUCKET_NAME}/backgrounds/${eventId}/background.jpg`
+  // Use R2 bucket name from environment instead of hardcoded STORAGE.BUCKET_NAME
+  const bucketName = env.R2_BUCKET_NAME || STORAGE.BUCKET_NAME
+  return `${bucketName}/backgrounds/${eventId}/background.jpg`
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await params
     const supabase = createRouteSupabaseClient(req)
-    const admin = createSupabaseAdmin()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const authResult = await requireEventModerator(supabase as any, eventId)
     if ('error' in authResult) return authResult.error
@@ -33,24 +35,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
     }
 
     const arrayBuffer = await imageFile.arrayBuffer()
-    const blob = new Blob([arrayBuffer], { type: imageFile.type })
+    const buffer = Buffer.from(arrayBuffer)
 
     const storagePath = getBackgroundStoragePath(eventId)
-    const pathInBucket = storagePath.replace(`${STORAGE.BUCKET_NAME}/`, '')
+    const r2Key = generateR2Key(storagePath)
 
     // Remove old background if exists
-    await admin.storage.from(STORAGE.BUCKET_NAME).remove([pathInBucket])
+    await deleteFileFromR2(r2Key)
+
+    // Convert Buffer to Blob for upload
+    const backgroundBlob = new Blob([buffer], { type: imageFile.type })
 
     // Upload new background
-    const { error: uploadErr } = await admin.storage
-      .from(STORAGE.BUCKET_NAME)
-      .upload(pathInBucket, blob, {
-        contentType: imageFile.type,
-        upsert: true,
-      })
+    const uploadResult = await uploadFileToR2(r2Key, backgroundBlob, {
+      contentType: imageFile.type,
+    })
 
-    if (uploadErr) {
-      return NextResponse.json({ error: uploadErr.message || 'Failed to upload background' }, { status: 500 })
+    if (!uploadResult.success) {
+      return NextResponse.json({ error: uploadResult.error || 'Failed to upload background' }, { status: 500 })
     }
 
     // Updates event background image
@@ -65,15 +67,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
     }
 
     // Return signed URL
-    const { data: signed } = await admin.storage
-      .from(STORAGE.BUCKET_NAME)
-      .createSignedUrl(pathInBucket, STORAGE.SIGNED_URL_EXPIRY)
+    const signedResult = await getR2SignedUrl(r2Key, STORAGE.SIGNED_URL_EXPIRY)
 
-    if (!signed) {
+    if (!signedResult.success || !signedResult.url) {
       return NextResponse.json({ error: 'Failed to sign background URL' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, url: signed.signedUrl, path: storagePath })
+    return NextResponse.json({ success: true, url: signedResult.url, path: storagePath })
   } catch (err) {
     console.error('Background upload failed', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -84,15 +84,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ e
   try {
     const { eventId } = await params
     const supabase = createRouteSupabaseClient(req)
-    const admin = createSupabaseAdmin()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const authResult = await requireEventModerator(supabase as any, eventId)
     if ('error' in authResult) return authResult.error
 
     const storagePath = getBackgroundStoragePath(eventId)
-    const pathInBucket = storagePath.replace(`${STORAGE.BUCKET_NAME}/`, '')
+    const r2Key = generateR2Key(storagePath)
 
-    await admin.storage.from(STORAGE.BUCKET_NAME).remove([pathInBucket])
+    await deleteFileFromR2(r2Key)
 
     // Updates event background image to null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

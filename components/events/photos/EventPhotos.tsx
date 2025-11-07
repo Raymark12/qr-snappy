@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { Box, Button, Alert, Container, Typography, Paper, Skeleton } from '@mui/material'
 import { ArrowBack as BackIcon } from '@mui/icons-material'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Event } from '@/types'
 import { useEventPhotos } from '@/hooks/usePhotos'
 import PhotosGrid from './PhotosGrid'
@@ -16,9 +17,15 @@ interface EventPhotosProps {
   canUpload: boolean
 }
 
-export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
+export default function EventPhotos({ event: initialEvent, canUpload }: EventPhotosProps) {
+  const router = useRouter()
+  const [event, setEvent] = useState(initialEvent)
   const { data: photos, isLoading, error } = useEventPhotos(event.id)
   const [showContent, setShowContent] = useState(false)
+
+  useEffect(() => {
+    setEvent(initialEvent)
+  }, [initialEvent])
 
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null
@@ -62,6 +69,10 @@ export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
           backgroundImagePath={
             'background_image_path' in event ? (event.background_image_path as string | null) : null
           }
+          event={event}
+          onEventUpdate={() => {
+            router.refresh()
+          }}
         />
       </Box>
 
@@ -74,9 +85,23 @@ export default function EventPhotos({ event, canUpload }: EventPhotosProps) {
           width: '100%',
         }}
       >
-        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 4 }}>
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
           Event Photos
         </Typography>
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            Auto-approve:
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              color: event.auto_approve ? 'success.main' : 'warning.main',
+            }}
+          >
+            {event.auto_approve ? 'ON' : 'OFF'}
+          </Typography>
+        </Box>
 
         {canUpload && (
           <ErrorBoundary>

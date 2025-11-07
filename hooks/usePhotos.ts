@@ -18,28 +18,90 @@ async function fetchEventPhotos(eventId: string, publicMode = false): Promise<Ph
   return apiGet<Photo[]>(endpoint)
 }
 
+async function getUploadUrl(eventId: string, filename: string, contentType: string, publicMode = false) {
+  const endpoint = publicMode ? `/api/public/events/${eventId}/photos/upload-url` : `/api/events/${eventId}/photos/upload-url`
+  return apiPost<{ success: boolean; uploadUrl: string; filePath: string; fileName: string; userEmail?: string }>(endpoint, {
+    fileName: filename,
+    contentType,
+  })
+}
+
+async function uploadToR2(uploadUrl: string, file: File, onProgress?: (progress: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable && onProgress) {
+        const progress = (event.loaded / event.total) * 100
+        onProgress(progress)
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        reject(new Error(`Upload failed with status ${xhr.status}`))
+      }
+    })
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('Upload failed'))
+    })
+
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.send(file)
+  })
+}
+
+async function completeUpload(
+  eventId: string,
+  filePath: string,
+  fileName: string,
+  author: string | null,
+  comment: string | null,
+  publicMode = false
+): Promise<{ success: boolean; id: string }> {
+  const endpoint = publicMode ? `/api/public/events/${eventId}/photos/complete-upload` : `/api/events/${eventId}/photos/complete-upload`
+  return apiPost<{ success: boolean; id: string }>(endpoint, {
+    filePath,
+    fileName,
+    author,
+    comment,
+  })
+}
+
 async function uploadPhoto(
   eventId: string,
   data: { file: File; author?: string; comment?: string },
-  publicMode = false
+  publicMode = false,
+  onProgress?: (progress: number) => void
 ): Promise<{ success: boolean; id: string }> {
-  const formData = new FormData()
-  formData.append('file', data.file)
-  if (data.author) formData.append('author', data.author)
-  if (data.comment) formData.append('comment', data.comment)
+  try {
+    //Get pre-signed upload URL
+    const urlResult = await getUploadUrl(eventId, data.file.name, data.file.type, publicMode)
 
-  const endpoint = publicMode ? `/api/public/events/${eventId}/photos` : `/api/events/${eventId}/photos`
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    body: formData,
-  })
+    if (!urlResult.uploadUrl || !urlResult.filePath) {
+      throw new Error('Failed to get upload URL')
+    }
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: 'Upload failed' }))
-    throw new Error(error.error || 'Upload failed')
+    //Upload file directly to R2
+    await uploadToR2(urlResult.uploadUrl, data.file, onProgress)
+
+    //Complete upload by saving metadata
+    return await completeUpload(
+      eventId,
+      urlResult.filePath,
+      urlResult.fileName || data.file.name,
+      data.author || null,
+      data.comment || null,
+      publicMode
+    )
+  } catch (error) {
+    console.error('Upload failed:', error)
+    throw error
   }
-
-  return res.json()
 }
 
 export function useEventPhotos(eventId: string, publicMode = false, enabled = true) {
@@ -53,80 +115,20 @@ export function useEventPhotos(eventId: string, publicMode = false, enabled = tr
   })
 }
 
-export function useUploadPhoto(eventId: string, publicMode = false) {
+export function useUploadPhoto(eventId: string, publicMode = false, onProgress?: (progress: number) => void) {
   const queryClient = useQueryClient()
   const queryKey = [...photoKeys.event(eventId), publicMode ? 'public' : 'private']
 
   return useMutation({
     mutationFn: (data: { file: File; author?: string; comment?: string }) =>
-      uploadPhoto(eventId, data, publicMode),
-    onMutate: async (uploadData) => {
-      await queryClient.cancelQueries({ queryKey })
-
-      const previousPhotos = queryClient.getQueryData<Photo[]>(queryKey)
-
-      if (!publicMode && previousPhotos) {
-        const optimisticPhoto: Photo = {
-          id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-          event_id: eventId,
-          user_email: null,
-          file_path: '',
-          file_name: uploadData.file.name,
-          author: uploadData.author || null,
-          comment: uploadData.comment || null,
-          status: 'pending',
-          uploaded_at: new Date().toISOString(),
-          reviewed_at: null,
-          reviewed_by: null,
-        }
-
-        queryClient.setQueryData<Photo[]>(
-          queryKey,
-          [optimisticPhoto, ...previousPhotos]
-        )
-      }
-
-      return { previousPhotos }
+      uploadPhoto(eventId, data, publicMode, onProgress),
+    onSuccess: () => {
+      // Simply invalidate the cache to refetch the latest data
+      queryClient.invalidateQueries({ queryKey })
     },
-
-    onError: (_err, _uploadData, context) => {
-
-      if (context?.previousPhotos) {
-        queryClient.setQueryData(queryKey, context.previousPhotos)
-      }
-    },
-    onSuccess: async (data) => {
-      if (data.id) {
-        // In public mode, just invalidate since pending photos won't show up
-        if (publicMode) {
-          queryClient.invalidateQueries({ queryKey })
-          return
-        }
-
-        try {
-          const updatedPhotos = await fetchEventPhotos(eventId, publicMode)
-          const currentPhotos = queryClient.getQueryData<Photo[]>(queryKey)
-
-          if (currentPhotos && updatedPhotos) {
-            const optimisticIndex = currentPhotos.findIndex((p) => p.id.startsWith('temp-'))
-            if (optimisticIndex !== -1) {
-              const realPhoto = updatedPhotos.find((p) => p.id === data.id)
-              if (realPhoto) {
-                const newPhotos = [...currentPhotos]
-                newPhotos[optimisticIndex] = realPhoto
-                queryClient.setQueryData(queryKey, newPhotos)
-              } else {
-                queryClient.setQueryData(queryKey, updatedPhotos)
-              }
-            } else {
-              queryClient.setQueryData(queryKey, updatedPhotos)
-            }
-          }
-        } catch (error) {
-          console.error('Failed to update photo after upload:', error)
-          queryClient.invalidateQueries({ queryKey })
-        }
-      }
+    onError: () => {
+      // Invalidate on error to ensure data consistency
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 }
@@ -192,7 +194,7 @@ export function useApprovePhoto(eventId: string): UseMutationResult<
 }
 
 
-async function deletePhotoFunction(eventId: string, photoId: string): Promise<{ success: boolean }> {
+async function deletePhoto(eventId: string, photoId: string): Promise<{ success: boolean }> {
   return apiDelete<{ success: boolean }>(`/api/events/${eventId}/photos/${photoId}`)
 }
 
@@ -210,7 +212,7 @@ export function useDeletePhoto(eventId: string): UseMutationResult<
     string,
     PhotoMutationContext
   >({
-    mutationFn: (photoId: string) => deletePhotoFunction(eventId, photoId),
+    mutationFn: (photoId: string) => deletePhoto(eventId, photoId),
     onMutate: async (photoId) => {
       await queryClient.cancelQueries({ queryKey: photoKeys.event(eventId) })
 
@@ -232,6 +234,7 @@ export function useDeletePhoto(eventId: string): UseMutationResult<
     },
 
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: photoKeys.event(eventId) })
     },
   })
 }
@@ -275,6 +278,7 @@ export function useRejectPhoto(eventId: string): UseMutationResult<
     },
 
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: photoKeys.event(eventId) })
     },
   })
 }

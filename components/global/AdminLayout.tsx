@@ -12,7 +12,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const { user } = useAuth()
-
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleDrawerToggle = () => {
