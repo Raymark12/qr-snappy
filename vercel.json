@@ -1,0 +1,37 @@
+{
+  "functions": {
+    "app/api/events/[eventId]/photos/route.ts": {
+      "maxDuration": 300,
+      "memory": 2048
+    },
+    "app/api/public/events/[eventId]/photos/route.ts": {
+      "maxDuration": 300,
+      "memory": 2048
+    },
+    "app/api/events/[eventId]/photos/upload-url/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "app/api/events/[eventId]/photos/complete-upload/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "app/api/events/[eventId]/photos/batch-upload-urls/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "app/api/public/events/[eventId]/photos/batch-upload-urls/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "app/api/public/events/[eventId]/photos/upload-url/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "app/api/public/events/[eventId]/photos/complete-upload/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "regions": ["iad1"]
+}

@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { requireEventModerator } from '@/lib/utils/auth-helpers'
 import { deletePhoto } from '@/lib/db/event-photos'
-import { deleteFileFromStorage } from '@/lib/utils/storage'
+import { deleteFileFromStorage, normalizeStoragePath } from '@/lib/utils/storage'
 import { photoIdParamSchema } from '@/lib/validations'
 
 export async function DELETE(
@@ -11,9 +11,13 @@ export async function DELETE(
   { params }: { params: Promise<{ eventId: string; photoId: string }> }
 ) {
   let filePath: string | null = null
+  let eventId: string | undefined
+  let photoId: string | undefined
 
   try {
-    const { eventId, photoId } = await params
+    const paramsData = await params
+    eventId = paramsData.eventId
+    photoId = paramsData.photoId
 
     const validationResult = photoIdParamSchema.safeParse({ eventId, photoId })
     if (!validationResult.success) {
@@ -44,9 +48,14 @@ export async function DELETE(
     filePath = deleteResult.filePath || null
 
     if (filePath) {
-      const storageDeleteResult = await deleteFileFromStorage(filePath)
+      const fullPath = normalizeStoragePath(filePath)
+      const storageDeleteResult = await deleteFileFromStorage(fullPath)
       if (!storageDeleteResult.success) {
-        console.error('Failed to delete file from storage:', storageDeleteResult.error)
+        console.error('Failed to delete file from storage after DB deletion:', storageDeleteResult.error, 'photoId:', photoId, 'eventId:', eventId, 'filePath:', fullPath)
+        return NextResponse.json(
+          { error: 'Photo deleted from database but failed to delete from storage. Please contact support.' },
+          { status: 500 }
+        )
       }
     }
 
@@ -54,11 +63,12 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Delete photo error:', err)
+    console.error('Delete photo error:', err, 'photoId:', photoId || 'unknown', 'eventId:', eventId || 'unknown')
 
     if (filePath) {
-      await deleteFileFromStorage(filePath).catch((error) => {
-        console.error('Failed to delete file from storage in error handler:', error)
+      const fullPath = normalizeStoragePath(filePath)
+      await deleteFileFromStorage(fullPath).catch((error) => {
+        console.error('Failed to delete file from storage in error handler:', error, 'photoId:', photoId || 'unknown', 'eventId:', eventId || 'unknown', 'filePath:', fullPath)
       })
     }
 
