@@ -101,7 +101,7 @@ export default function PhotosGrid({ photos, eventId, publicMode = false }: Phot
       >
         {photos.map((photo, index) => (
           <PhotoItem
-            key={photo.id}
+            key={`${photo.id}-${photo.file_path}-${photo.uploaded_at}`}
             photo={photo}
             eventId={eventId}
             priority={index === 0}

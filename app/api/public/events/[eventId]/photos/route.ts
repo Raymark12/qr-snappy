@@ -126,6 +126,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
     }
 
     revalidatePath(`/e/${eventId}/photos`)
+    revalidatePath(`/events/${eventId}/photos`)
 
     return NextResponse.json({ success: true, id: photoData?.id })
   } catch (err) {
