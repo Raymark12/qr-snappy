@@ -13,6 +13,7 @@ import {
 import { apiGet } from '@/lib/utils/api-client'
 import { getImageUrl } from '@/lib/actions/image-url'
 import { useIsEventModerator, useIsAdmin, useAuth } from '@/hooks/useAuth'
+import { env } from '@/lib/env'
 import EventEditDialog from '@/components/events/dialogs/EventEditDialog'
 
 interface EventQRSectionProps {
@@ -59,7 +60,8 @@ export default function EventQRSection({
   const backgroundInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    setOrigin(window.location.origin)
+    // Use the same base URL that QR generation uses for consistency
+    setOrigin(env.NEXT_PUBLIC_APP_URL || window.location.origin)
   }, [])
 
   const fetchExisting = async () => {
