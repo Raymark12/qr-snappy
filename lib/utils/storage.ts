@@ -5,18 +5,6 @@ import { getR2SignedUrl, generateR2Key, uploadFileToR2, deleteFileFromR2 } from 
 import { cookies } from 'next/headers'
 import { STORAGE } from '@/lib/constants'
 
-/**
- * Standard API response types for consistency
- */
-export type ApiResponse<T> = {
-  success: true
-  data: T
-} | {
-  success: false
-  error: string
-  code?: string
-}
-
 export async function getAuthenticatedImageUrl(
   filePath: string,
   options?: { publicMode?: boolean; eventId?: string }

@@ -2,18 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { requireAdmin } from '@/lib/utils/auth-helpers'
 import { removeEventAssignment } from '@/lib/db/event-assignments'
+import { validateUserId } from '@/lib/utils/validation'
 import { z } from 'zod'
 
 const unassignEventSchema = z.object({
   eventId: z.string().uuid(),
 })
-
-// UUID validation regex
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function validateUserId(userId: string): boolean {
-  return UUID_REGEX.test(userId)
-}
 
 export async function POST(
   req: NextRequest,
@@ -22,7 +16,6 @@ export async function POST(
   try {
     const { userId } = await params
 
-    // Validate userId format
     if (!validateUserId(userId)) {
       return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
     }

@@ -3,19 +3,13 @@ import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { requireAdmin } from '@/lib/utils/auth-helpers'
 import { createSupabaseAdmin } from '@/lib/supabase/client'
 import { getUserById } from '@/lib/db/users'
+import { validateUserId } from '@/lib/utils/validation'
 import { z } from 'zod'
 
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
   role: z.enum(['admin', 'user', 'client']).optional(),
 })
-
-// UUID validation regex
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function validateUserId(userId: string): boolean {
-  return UUID_REGEX.test(userId)
-}
 
 export async function PATCH(
   req: NextRequest,
