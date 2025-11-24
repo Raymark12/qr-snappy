@@ -6,6 +6,10 @@ import { validateFile, getMediaStoragePath } from '@/lib/utils/file-validation'
 import { eventIdParamSchema } from '@/lib/validations'
 import { getEventById } from '@/lib/db/events'
 
+// Route segment config for Vercel deployment
+export const maxDuration = 300 // 5 minutes for photo uploads
+export const dynamic = 'force-dynamic'
+
 export async function GET(_req: Request, { params }: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await params

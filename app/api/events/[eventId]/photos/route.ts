@@ -7,6 +7,9 @@ import { validateFile, getMediaStoragePath } from '@/lib/utils/file-validation'
 import { eventIdParamSchema } from '@/lib/validations'
 import { getEventPhotos, insertPhotoRow } from '@/lib/db/event-photos'
 
+export const maxDuration = 300 // 5 minutes
+export const dynamic = 'force-dynamic'
+
 export async function GET(_req: Request, { params }: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await params
