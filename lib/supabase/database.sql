@@ -2,7 +2,7 @@
 -- Run this SQL in your Supabase SQL Editor
 --
 -- This file contains the complete database schema including:
--- - Tables (profiles, events, event_assignments, photos)
+-- - Tables (profiles, events, event_assignments, media)
 -- - Row Level Security (RLS) policies
 -- - Storage bucket policies
 -- - Triggers and functions
@@ -46,13 +46,22 @@ CREATE TABLE IF NOT EXISTS event_assignments (
   UNIQUE(event_id, client_id)
 );
 
--- Create photos table
-CREATE TABLE IF NOT EXISTS photos (
+-- Create media table (supports both images and videos)
+CREATE TABLE IF NOT EXISTS media (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   event_id UUID REFERENCES events(id) ON DELETE CASCADE NOT NULL,
   user_email TEXT,
+  media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video')),
   file_path TEXT NOT NULL,
   file_name TEXT NOT NULL,
+  thumbnail_path TEXT,
+  preview_path TEXT,
+  file_size BIGINT,
+  thumbnail_size BIGINT,
+  preview_size BIGINT,
+  width INTEGER,
+  height INTEGER,
+  duration INTEGER,
   author TEXT,
   comment TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved')),
@@ -65,7 +74,7 @@ CREATE TABLE IF NOT EXISTS photos (
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_assignments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media ENABLE ROW LEVEL SECURITY;
 
 -- Function to check if current user is admin (bypasses RLS to avoid recursion)
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -240,34 +249,34 @@ CREATE POLICY "Admins can delete event assignments" ON event_assignments
     )
   );
 
--- RLS Policies for photos
-CREATE POLICY "Anyone can view approved photos" ON photos
+-- RLS Policies for media
+CREATE POLICY "Anyone can view approved media" ON media
   FOR SELECT USING (status = 'approved');
 
-CREATE POLICY "Event admins can view all photos for their events" ON photos
+CREATE POLICY "Event admins can view all media for their events" ON media
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM events e
       JOIN profiles p ON p.id = auth.uid()
-      WHERE e.id = photos.event_id 
+      WHERE e.id = media.event_id
       AND e.admin_id = auth.uid()
       AND p.role = 'admin'
     )
   );
 
--- Assigned clients can view all photos (pending and approved) for their assigned events
-CREATE POLICY "Assigned clients can view all photos for their events" ON photos
+-- Assigned clients can view all media (pending and approved) for their assigned events
+CREATE POLICY "Assigned clients can view all media for their events" ON media
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM event_assignments ea
       JOIN profiles p ON p.id = auth.uid()
-      WHERE ea.event_id = photos.event_id 
+      WHERE ea.event_id = media.event_id
       AND ea.client_id = auth.uid()
       AND p.role = 'client'
     )
   );
 
-CREATE POLICY "Anyone can insert photos to active events" ON photos
+CREATE POLICY "Anyone can insert media to active events" ON media
   FOR INSERT WITH CHECK (
     EXISTS (
       SELECT 1 FROM events
@@ -276,47 +285,47 @@ CREATE POLICY "Anyone can insert photos to active events" ON photos
     )
   );
 
-CREATE POLICY "Event admins can update photo status" ON photos
+CREATE POLICY "Event admins can update media status" ON media
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM events e
       JOIN profiles p ON p.id = auth.uid()
-      WHERE e.id = photos.event_id 
+      WHERE e.id = media.event_id
       AND e.admin_id = auth.uid()
       AND p.role = 'admin'
     )
   );
 
--- Assigned clients can update photo status for their assigned events
-CREATE POLICY "Assigned clients can update photo status" ON photos
+-- Assigned clients can update media status for their assigned events
+CREATE POLICY "Assigned clients can update media status" ON media
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM event_assignments ea
       JOIN profiles p ON p.id = auth.uid()
-      WHERE ea.event_id = photos.event_id 
+      WHERE ea.event_id = media.event_id
       AND ea.client_id = auth.uid()
       AND p.role = 'client'
     )
   );
 
-CREATE POLICY "Event admins can delete photos from their events" ON photos
+CREATE POLICY "Event admins can delete media from their events" ON media
   FOR DELETE USING (
     EXISTS (
       SELECT 1 FROM events e
       JOIN profiles p ON p.id = auth.uid()
-      WHERE e.id = photos.event_id 
+      WHERE e.id = media.event_id
       AND e.admin_id = auth.uid()
       AND p.role = 'admin'
     )
   );
 
--- Assigned clients can delete photos from their assigned events
-CREATE POLICY "Assigned clients can delete photos from their events" ON photos
+-- Assigned clients can delete media from their assigned events
+CREATE POLICY "Assigned clients can delete media from their events" ON media
   FOR DELETE USING (
     EXISTS (
       SELECT 1 FROM event_assignments ea
       JOIN profiles p ON p.id = auth.uid()
-      WHERE ea.event_id = photos.event_id 
+      WHERE ea.event_id = media.event_id
       AND ea.client_id = auth.uid()
       AND p.role = 'client'
     )
@@ -330,9 +339,11 @@ CREATE INDEX IF NOT EXISTS idx_event_assignments_event_id ON event_assignments(e
 CREATE INDEX IF NOT EXISTS idx_event_assignments_client_id ON event_assignments(client_id);
 CREATE INDEX IF NOT EXISTS idx_event_assignments_assigned_by ON event_assignments(assigned_by);
 
-CREATE INDEX IF NOT EXISTS idx_photos_event_id ON photos(event_id);
-CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(status);
-CREATE INDEX IF NOT EXISTS idx_photos_uploaded_at ON photos(uploaded_at);
+CREATE INDEX IF NOT EXISTS idx_media_event_id ON media(event_id);
+CREATE INDEX IF NOT EXISTS idx_media_status ON media(status);
+CREATE INDEX IF NOT EXISTS idx_media_uploaded_at ON media(uploaded_at);
+CREATE INDEX IF NOT EXISTS idx_media_media_type ON media(media_type);
+CREATE INDEX IF NOT EXISTS idx_media_file_size ON media(file_size) WHERE file_size IS NOT NULL;
 
 -- Function to automatically create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -377,13 +388,15 @@ CREATE TRIGGER handle_events_updated_at
 -- 1. Go to Storage > Create Bucket
 -- 2. Create bucket named "Photos" (public or private as needed)
 --    - This bucket stores:
---      * Photos: Photos/{eventId}/{filename}
+--      * Media (images & videos): Photos/{eventId}/originals/{filename}
+--      * Thumbnails: Photos/{eventId}/thumbnails/{filename}
+--      * Video Previews: Photos/{eventId}/previews/{filename}
 --      * QR Codes: Photos/qr/{eventId}/event-qr.png
 --      * Background Images: Photos/backgrounds/{eventId}/background.jpg
 --
 -- The following policies will apply once the bucket is created.
 
--- 2. Allow authenticated users to upload photos
+-- 2. Allow authenticated users to upload media
 CREATE POLICY "Allow authenticated uploads to Photos bucket"
 ON storage.objects
 FOR INSERT
@@ -404,7 +417,7 @@ WITH CHECK (
   )
 );
 
--- 3. Allow users to view photos from their assigned events
+-- 3. Allow users to view media from their assigned events
 CREATE POLICY "Allow authenticated reads from Photos bucket"
 ON storage.objects
 FOR SELECT
@@ -412,10 +425,10 @@ TO authenticated
 USING (
   bucket_id = 'Photos'
   AND (
-    -- Admin can view all photos
+    -- Admin can view all media
     (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
     OR
-    -- Client can view photos from assigned events
+    -- Client can view media from assigned events
     EXISTS (
       SELECT 1 
       FROM public.event_assignments 
@@ -425,7 +438,7 @@ USING (
   )
 );
 
--- 4. Admins and assigned clients can delete photos
+-- 4. Admins and assigned clients can delete media
 CREATE POLICY "Admins can delete from Photos bucket"
 ON storage.objects
 FOR DELETE
@@ -450,21 +463,21 @@ USING (
 );
 
 -- Performance indexes
--- Add indexes for better photo query performance
-CREATE INDEX IF NOT EXISTS idx_photos_event_status_uploaded
-ON photos(event_id, status, uploaded_at DESC);
+-- Add indexes for better media query performance
+CREATE INDEX IF NOT EXISTS idx_media_event_status_uploaded
+ON media(event_id, status, uploaded_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_photos_status_uploaded
-ON photos(status, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_status_uploaded
+ON media(status, uploaded_at DESC);
 
 -- Additional indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_photos_user_email ON photos(user_email) WHERE user_email IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_photos_uploaded_at ON photos(uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_user_email ON media(user_email) WHERE user_email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_media_uploaded_at ON media(uploaded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_admin_id ON events(admin_id);
 CREATE INDEX IF NOT EXISTS idx_events_is_active ON events(is_active);
 CREATE INDEX IF NOT EXISTS idx_event_assignments_client_event ON event_assignments(client_id, event_id);
 
--- 5. Admins and assigned clients can update/move photos
+-- 5. Admins and assigned clients can update/move media
 CREATE POLICY "Admins can update Photos bucket"
 ON storage.objects
 FOR UPDATE
@@ -494,9 +507,37 @@ USING (
 WITH CHECK (
   bucket_id = 'Photos'
   AND EXISTS (
-    SELECT 1 
-    FROM public.event_assignments 
-    WHERE client_id = auth.uid() 
+    SELECT 1
+    FROM public.event_assignments
+    WHERE client_id = auth.uid()
     AND event_id = (storage.foldername(name))[1]::uuid
   )
 );
+
+-- ============================================================================
+-- MIGRATION FROM PHOTOS TO MEDIA TABLE
+-- ============================================================================
+-- If you have an existing 'photos' table, run these commands to migrate to the new 'media' structure:
+--
+-- 1. Add new columns to existing photos table (if not already done):
+--    ALTER TABLE photos ADD COLUMN media_type TEXT CHECK (media_type IN ('image', 'video'));
+--    ALTER TABLE photos ADD COLUMN thumbnail_path TEXT;
+--    ALTER TABLE photos ADD COLUMN preview_path TEXT;
+--    ALTER TABLE photos ADD COLUMN file_size BIGINT;
+--    ALTER TABLE photos ADD COLUMN thumbnail_size BIGINT;
+--    ALTER TABLE photos ADD COLUMN preview_size BIGINT;
+--    ALTER TABLE photos ADD COLUMN width INTEGER;
+--    ALTER TABLE photos ADD COLUMN height INTEGER;
+--    ALTER TABLE photos ADD COLUMN duration INTEGER;
+--
+-- 2. Update existing records to have media_type (you'll need to determine this based on file extensions):
+--    UPDATE photos SET media_type = 'image' WHERE file_name ~ '\.(jpg|jpeg|png|gif|webp|bmp|tiff)$';
+--    UPDATE photos SET media_type = 'video' WHERE file_name ~ '\.(mp4|avi|mov|mkv|webm|flv)$';
+--
+-- 3. Rename the table (this preserves all data and RLS policies):
+--    ALTER TABLE photos RENAME TO media;
+--
+-- 4. Update any storage bucket references in your application code from 'photos/' to 'media/'
+--
+-- Note: The storage bucket remains named "Photos" for backward compatibility,
+-- but the file organization now follows: Photos/{eventId}/{originals|thumbnails|previews}/

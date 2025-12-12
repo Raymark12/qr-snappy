@@ -123,13 +123,22 @@ export interface Database {
           }
         ]
       }
-      photos: {
+      media: {
         Row: {
           id: string
           event_id: string
           user_email: string | null
+          media_type: 'image' | 'video'
           file_path: string
           file_name: string
+          thumbnail_path: string | null
+          preview_path: string | null
+          file_size: number | null
+          thumbnail_size: number | null
+          preview_size: number | null
+          width: number | null
+          height: number | null
+          duration: number | null
           author: string | null
           comment: string | null
           status: 'pending' | 'approved'
@@ -141,8 +150,17 @@ export interface Database {
           id?: string
           event_id: string
           user_email?: string | null
+          media_type?: 'image' | 'video'
           file_path: string
           file_name: string
+          thumbnail_path?: string | null
+          preview_path?: string | null
+          file_size?: number | null
+          thumbnail_size?: number | null
+          preview_size?: number | null
+          width?: number | null
+          height?: number | null
+          duration?: number | null
           author?: string | null
           comment?: string | null
           status?: 'pending' | 'approved'
@@ -154,8 +172,17 @@ export interface Database {
           id?: string
           event_id?: string
           user_email?: string | null
+          media_type?: 'image' | 'video'
           file_path?: string
           file_name?: string
+          thumbnail_path?: string | null
+          preview_path?: string | null
+          file_size?: number | null
+          thumbnail_size?: number | null
+          preview_size?: number | null
+          width?: number | null
+          height?: number | null
+          duration?: number | null
           author?: string | null
           comment?: string | null
           status?: 'pending' | 'approved'
@@ -165,13 +192,13 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: "photos_event_id_fkey"
+            foreignKeyName: "media_event_id_fkey"
             columns: ["event_id"]
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "photos_reviewed_by_fkey"
+            foreignKeyName: "media_reviewed_by_fkey"
             columns: ["reviewed_by"]
             referencedRelation: "profiles"
             referencedColumns: ["id"]
