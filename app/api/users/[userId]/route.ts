@@ -18,7 +18,6 @@ export async function PATCH(
   try {
     const { userId } = await params
 
-    // Validate userId format
     if (!validateUserId(userId)) {
       return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
     }
@@ -92,7 +91,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
-    // Check if the user being deleted exists and get their role
     const userToDelete = await getUserById(userId)
 
     if (!userToDelete) {
@@ -120,7 +118,7 @@ export async function DELETE(
 
     // Clean up references
     await adminClient
-      .from('photos')
+      .from('media')
       .update({ reviewed_by: null })
       .eq('reviewed_by', userId)
 
