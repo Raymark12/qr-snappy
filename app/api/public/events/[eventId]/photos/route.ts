@@ -10,9 +10,10 @@ import { getEventById } from '@/lib/db/events'
 export const maxDuration = 300 // 5 minutes for photo uploads
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: Request, { params }: { params: Promise<{ eventId: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await params
+    const { searchParams } = new URL(req.url)
 
     const validationResult = eventIdParamSchema.safeParse({ eventId })
     if (!validationResult.success) {
@@ -31,21 +32,59 @@ export async function GET(_req: Request, { params }: { params: Promise<{ eventId
       return NextResponse.json({ error: 'Event is not active' }, { status: 403 })
     }
 
-    // Public users can only see approved photos
+    // Check if pagination is requested
+    const cursor = searchParams.get('cursor')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50) // Max 50 per page
+
+    if (cursor || limit !== 20) {
+      // Use paginated version
+      const adminClient = createSupabaseAdmin()
+      let query = adminClient
+        .from('media')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('status', 'approved')
+        .order('uploaded_at', { ascending: false })
+        .limit(limit + 1) // Fetch one extra to check if there are more
+
+      if (cursor) {
+        query = query.lt('uploaded_at', cursor)
+      }
+
+      const { data: mediaData, error: fetchError } = await query
+
+      if (fetchError) {
+        console.error('Error fetching paginated media:', fetchError)
+        return NextResponse.json({ error: 'Failed to fetch media' }, { status: 500 })
+      }
+
+      const data = (mediaData || [])
+      const hasMore = data.length > limit
+      const actualData = hasMore ? data.slice(0, limit) : data
+      const nextCursor = actualData.length > 0 ? actualData[actualData.length - 1].uploaded_at : null
+
+      return NextResponse.json({
+        data: actualData,
+        hasMore,
+        nextCursor
+      })
+    }
+
+    // Fallback to legacy non-paginated version for backward compatibility
     const adminClient = createSupabaseAdmin()
-    const { data: photosData, error: fetchError } = await adminClient
-      .from('photos')
+    const { data: mediaData, error: fetchError } = await adminClient
+      .from('media')
       .select('*')
       .eq('event_id', eventId)
       .eq('status', 'approved')
       .order('uploaded_at', { ascending: false })
 
     if (fetchError) {
-      console.error('Error fetching photos:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch photos' }, { status: 500 })
+      console.error('Error fetching media:', fetchError)
+      return NextResponse.json({ error: 'Failed to fetch media' }, { status: 500 })
     }
 
-    return NextResponse.json(photosData || [])
+    return NextResponse.json({ data: mediaData || [], hasMore: false, nextCursor: null })
   } catch (err) {
     console.error('Fetch photos error:', err)
     return NextResponse.json({ error: 'Failed to fetch photos' }, { status: 500 })
@@ -101,9 +140,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
       return NextResponse.json({ error: uploadResult.error || 'Upload failed' }, { status: 500 })
     }
 
-    // Insert photo with pending status using admin client (bypasses RLS)
-    const { data: photoData, error: insertError } = await adminClient
-      .from('photos')
+    // Insert media with pending status using admin client (bypasses RLS)
+    const { data: mediaData, error: insertError } = await adminClient
+      .from('media')
       .insert({
         event_id: eventId,
         user_email: null,
@@ -117,7 +156,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
       .single<{ id: string }>()
 
     if (insertError) {
-      console.error('Error inserting photo row:', insertError)
+      console.error('Error inserting media row:', insertError)
 
       if (bucketPath) {
         const fullPath = normalizeStoragePath(bucketPath)
@@ -125,14 +164,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ eventId
       }
 
       return NextResponse.json({
-        error: 'Failed to save photo metadata',
+        error: 'Failed to save media metadata',
       }, { status: 500 })
     }
 
     revalidatePath(`/e/${eventId}/photos`)
     revalidatePath(`/events/${eventId}/photos`)
 
-    return NextResponse.json({ success: true, id: photoData?.id })
+    return NextResponse.json({ success: true, id: mediaData?.id })
   } catch (err) {
     console.error('Upload error:', err)
 

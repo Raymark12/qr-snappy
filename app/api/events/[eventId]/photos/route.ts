@@ -10,9 +10,10 @@ import { getEventPhotos, insertPhotoRow } from '@/lib/db/event-photos'
 export const maxDuration = 300 // 5 minutes
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: Request, { params }: { params: Promise<{ eventId: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ eventId: string }> }) {
   try {
     const { eventId } = await params
+    const { searchParams } = new URL(req.url)
 
     const validationResult = eventIdParamSchema.safeParse({ eventId })
     if (!validationResult.success) {
@@ -22,9 +23,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ eventId
       )
     }
 
-    const photos = await getEventPhotos(eventId, true) // includePendingForModerator = true
+    // Check if pagination is requested
+    const cursor = searchParams.get('cursor')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50) // Max 50 per page
 
-    return NextResponse.json(photos)
+    if (cursor || limit !== 20) {
+      // Use paginated version
+      const { getEventPhotosPaginated } = await import('@/lib/db/event-photos')
+      const result = await getEventPhotosPaginated(eventId, cursor, limit, true)
+      return NextResponse.json(result)
+    }
+
+    // Fallback to legacy non-paginated version for backward compatibility
+    const photos = await getEventPhotos(eventId, true)
+    return NextResponse.json({ data: photos, hasMore: false, nextCursor: null })
   } catch (err) {
     console.error('Fetch photos error:', err)
     return NextResponse.json({ error: 'Failed to fetch photos' }, { status: 500 })

@@ -46,17 +46,32 @@ export async function DELETE(
     }
 
     filePath = deleteResult.filePath || null
+    const { thumbnailPath, previewPath } = deleteResult
+    console.log(`[Delete Photo] Deleting paths: original=${filePath}, thumb=${thumbnailPath}, preview=${previewPath}`)
 
     if (filePath) {
       const fullPath = normalizeStoragePath(filePath)
+      console.log(`[Delete Photo] Normalized original path: ${fullPath}`)
       const storageDeleteResult = await deleteFileFromStorage(fullPath)
       if (!storageDeleteResult.success) {
         console.error('Failed to delete file from storage after DB deletion:', storageDeleteResult.error, 'photoId:', photoId, 'eventId:', eventId, 'filePath:', fullPath)
-        return NextResponse.json(
-          { error: 'Photo deleted from database but failed to delete from storage. Please contact support.' },
-          { status: 500 }
-        )
       }
+    }
+
+    if (thumbnailPath) {
+      const fullPath = normalizeStoragePath(thumbnailPath)
+      console.log(`[Delete Photo] Normalized thumbnail path: ${fullPath}`)
+      await deleteFileFromStorage(fullPath).catch(err => 
+        console.error('Failed to delete thumbnail:', err, 'path:', fullPath)
+      )
+    }
+
+    if (previewPath) {
+      const fullPath = normalizeStoragePath(previewPath)
+      console.log(`[Delete Photo] Normalized preview path: ${fullPath}`)
+      await deleteFileFromStorage(fullPath).catch(err => 
+        console.error('Failed to delete preview:', err, 'path:', fullPath)
+      )
     }
 
     revalidatePath(`/events/${eventId}/photos`)

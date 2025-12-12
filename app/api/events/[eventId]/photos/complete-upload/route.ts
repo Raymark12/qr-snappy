@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRouteSupabaseClient } from '@/lib/supabase/route'
 import { requireAuth } from '@/lib/utils/auth-helpers'
+import { queueMediaProcessing } from '@/lib/jobs/media-processor'
+import { isVideoFileName } from '@/lib/utils/file-validation'
 import { z } from 'zod'
 
 const completeUploadSchema = z.object({
@@ -9,6 +11,7 @@ const completeUploadSchema = z.object({
   author: z.string().nullable().optional(),
   comment: z.string().nullable().optional(),
   userEmail: z.string().nullable().optional(),
+  fileSize: z.number().optional(),
 })
 
 export async function POST(
@@ -38,7 +41,7 @@ export async function POST(
       )
     }
 
-    const { filePath, fileName, author, comment, userEmail } = validationResult.data
+    const { filePath, fileName, author, comment, userEmail, fileSize } = validationResult.data
 
     if (userEmail && userEmail !== user.email) {
       return NextResponse.json(
@@ -63,14 +66,18 @@ export async function POST(
       return NextResponse.json({ error: 'Event is not active' }, { status: 403 })
     }
 
-    // Save photo record to database
+    const mediaType = isVideoFileName(fileName) ? 'video' : 'image'
+
+    // Save media record to database
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: photo, error: photoError } = await (supabase as any)
-      .from('photos')
+    const { data: media, error: mediaError } = await (supabase as any)
+      .from('media')
       .insert({
         event_id: eventId,
         file_path: filePath,
         file_name: fileName,
+        media_type: mediaType,
+        file_size: fileSize || null,
         author: author || null,
         comment: comment || null,
         status: event.auto_approve ? 'approved' : 'pending',
@@ -79,12 +86,23 @@ export async function POST(
       .select()
       .single()
 
-    if (photoError) {
-      console.error('Error saving photo:', photoError)
-      return NextResponse.json({ error: 'Failed to save photo' }, { status: 500 })
+    if (mediaError) {
+      console.error('Error saving media:', mediaError)
+      return NextResponse.json({ error: 'Failed to save media' }, { status: 500 })
     }
 
-    return NextResponse.json(photo)
+    // Queue background processing for thumbnails and video previews
+    queueMediaProcessing({
+      mediaId: media.id,
+      eventId,
+      filePath,
+      fileName,
+      fileSize: fileSize || 0,
+    }).catch(error => {
+      console.error('Failed to queue media processing:', error)
+    })
+
+    return NextResponse.json(media)
   } catch (error) {
     console.error('Complete upload error:', error)
     return NextResponse.json(
