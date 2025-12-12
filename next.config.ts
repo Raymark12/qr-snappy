@@ -21,6 +21,18 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Ignore ffmpeg dynamic requires in server build
+      config.externals = config.externals || []
+      config.externals.push({
+        '@ffmpeg-installer/ffmpeg': 'commonjs @ffmpeg-installer/ffmpeg',
+        'fluent-ffmpeg': 'commonjs fluent-ffmpeg',
+        '@ffprobe-installer/ffprobe': 'commonjs @ffprobe-installer/ffprobe',
+      })
+    }
+    return config
+  },
   async headers() {
     // Get allowed origins from environment
     const allowedOrigins = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
