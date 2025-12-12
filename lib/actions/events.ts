@@ -185,16 +185,43 @@ export async function deleteEvent(eventId: string): Promise<DeleteEventResult> {
       console.log(`Deleting event ${eventId}: found ${photos.length} photos to delete`)
     }
 
-    // Delete all photo files from R2
+    // Delete all photo files from R2 (including thumbnails and previews)
     const photoDeletePromises = photos.map(async (photo) => {
-      try {
-        const fullPath = normalizeStoragePath(photo.file_path)
-        const deleteResult = await deleteFileFromStorage(fullPath)
-        return deleteResult.success
-      } catch (error) {
-        console.error(`Failed to delete photo ${photo.file_path}:`, error)
-        return false
+      let success = true
+
+      // Delete original file
+      if (photo.file_path) {
+        try {
+          const fullPath = normalizeStoragePath(photo.file_path)
+          const deleteResult = await deleteFileFromStorage(fullPath)
+          if (!deleteResult.success) success = false
+        } catch (error) {
+          console.error(`Failed to delete photo ${photo.file_path}:`, error)
+          success = false
+        }
       }
+
+      // Delete thumbnail
+      if (photo.thumbnail_path) {
+        try {
+          const fullPath = normalizeStoragePath(photo.thumbnail_path)
+          await deleteFileFromStorage(fullPath)
+        } catch (error) {
+          console.error(`Failed to delete thumbnail ${photo.thumbnail_path}:`, error)
+        }
+      }
+
+      // Delete preview
+      if (photo.preview_path) {
+        try {
+          const fullPath = normalizeStoragePath(photo.preview_path)
+          await deleteFileFromStorage(fullPath)
+        } catch (error) {
+          console.error(`Failed to delete preview ${photo.preview_path}:`, error)
+        }
+      }
+
+      return success
     })
 
     // Delete QR code file

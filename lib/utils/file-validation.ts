@@ -43,9 +43,6 @@ export function validateFile(file: File): FileValidationResult {
   return { valid: true }
 }
 
-export function sanitizeFilename(filename: string): string {
-  return filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-}
 
 export function getFileExtension(filename: string): string {
   const lastDot = filename.lastIndexOf('.')
@@ -57,13 +54,7 @@ export function getFileExtension(filename: string): string {
 
 /**
  * Generate a fully random filename for storage
- * Original filename is stored in database only, not in storage path
  */
-export function getPhotoStoragePath(eventId: string, filename: string): string {
-  const extension = getFileExtension(filename)
-  const objectName = `${crypto.randomUUID()}${extension}`
-  return `${STORAGE.BUCKET_NAME}/${eventId}/${objectName}`
-}
 
 export function parseStoragePath(fullPath: string): {
   bucket: string
@@ -76,9 +67,6 @@ export function parseStoragePath(fullPath: string): {
   }
 }
 
-export function isVideoFile(file: File): boolean {
-  return file.type.startsWith('video/')
-}
 
 export function isVideoFileName(filename: string): boolean {
   const extension = getFileExtension(filename).toLowerCase()
@@ -88,7 +76,6 @@ export function isVideoFileName(filename: string): boolean {
 export function getMediaStoragePath(eventId: string, filename: string): string {
   const extension = getFileExtension(filename)
   const objectName = `${crypto.randomUUID()}${extension}`
-  // Use R2 bucket name from environment instead of hardcoded STORAGE.BUCKET_NAME
   const bucketName = env.R2_BUCKET_NAME || STORAGE.BUCKET_NAME
   return `${bucketName}/events/${eventId}/photos/${objectName}`
 }

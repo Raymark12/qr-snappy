@@ -19,7 +19,7 @@ export async function createServerSupabaseClient() {
             cookieStore.set(name, value, options)
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('Cookie set failed (expected in Server Components):', error)
+              console.warn('Cookie set failed (expected in Server Components):', error instanceof Error ? error.message : String(error))
             }
           }
         },
@@ -28,7 +28,7 @@ export async function createServerSupabaseClient() {
             cookieStore.set(name, '', options)
           } catch (error) {
             if (process.env.NODE_ENV === 'development') {
-              console.warn('Cookie remove failed (expected in Server Components):', error)
+              console.warn('Cookie remove failed (expected in Server Components):', error instanceof Error ? error.message : String(error))
             }
           }
         },
