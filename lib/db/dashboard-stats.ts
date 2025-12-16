@@ -63,20 +63,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 
   const { count: totalPhotos, error: photosError } = await supabase
-    .from('photos')
+    .from('media')
     .select('id', { count: 'exact', head: true })
 
   if (photosError) {
-    console.error('Error counting photos:', photosError)
+    console.error('Error counting media:', photosError)
   }
 
   const { count: pendingPhotos, error: pendingPhotosError } = await supabase
-    .from('photos')
+    .from('media')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'pending')
 
   if (pendingPhotosError) {
-    console.error('Error counting pending photos:', pendingPhotosError)
+    console.error('Error counting pending media:', pendingPhotosError)
   }
 
   // Get R2 storage usage

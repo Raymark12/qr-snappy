@@ -71,11 +71,42 @@ export const UI = {
   UPLOAD_ERROR_CLEANUP_DELAY: 3000,
 } as const
 
+export const MEDIA = {
+  THUMBNAIL: {
+    MAX_WIDTH: 200,
+    MAX_HEIGHT: 200,
+    QUALITY: 70,
+    FORMAT: 'webp' as const,
+  },
+  VIDEO: {
+    PREVIEW_RESOLUTION: '1280x720',
+    PREVIEW_BITRATE: '1M',
+    PREVIEW_CRF: 28, // Constant Rate Factor
+    PREVIEW_CODEC: 'libx264',
+    POSTER_TIME: '00:00:01', // Extract frame at 1 second
+    SMALL_VIDEO_SIZE_MB: 5, // Only skip preview for very small videos
+  },
+  LAZY_LOADING: {
+    ROOT_MARGIN: '200px',
+    THRESHOLD: 0.1,
+    PRELOAD_ADJACENT: 1,
+  },
+  PAGINATION: {
+    DEFAULT_PAGE_SIZE: 20,
+    MAX_PAGE_SIZE: 50,
+    INFINITE_SCROLL_THRESHOLD: 100, // Distance from bottom to trigger load (px)
+  },
+  LIGHTBOX: {
+    PRELOAD_ADJACENT: 2,
+    INITIAL_LOAD_RANGE: 5,
+  },
+} as const
+
 export const TOAST_MESSAGES = {
-  PHOTO_APPROVED: 'Photo approved successfully',
-  PHOTO_APPROVED_ERROR: 'Failed to approve photo. Please try again.',
-  PHOTO_REJECTED: 'Photo rejected and deleted',
-  PHOTO_REJECTED_ERROR: 'Failed to reject photo. Please try again.',
-  PHOTO_DELETED: 'Photo deleted successfully',
-  PHOTO_DELETED_ERROR: 'Failed to delete photo. Please try again.',
+  MEDIA_APPROVED: 'Media approved successfully',
+  MEDIA_APPROVED_ERROR: 'Failed to approve media. Please try again.',
+  MEDIA_REJECTED: 'Media rejected and deleted',
+  MEDIA_REJECTED_ERROR: 'Failed to reject media. Please try again.',
+  MEDIA_DELETED: 'Media deleted successfully',
+  MEDIA_DELETED_ERROR: 'Failed to delete media. Please try again.',
 } as const

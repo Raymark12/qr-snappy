@@ -26,15 +26,22 @@ export type EventAssignment = Tables<'event_assignments'>
 export type EventAssignmentInsert = TablesInsert<'event_assignments'>
 export type EventAssignmentUpdate = TablesUpdate<'event_assignments'>
 
-export type Photo = Tables<'photos'>
-export type PhotoInsert = TablesInsert<'photos'>
-export type PhotoUpdate = TablesUpdate<'photos'>
+export type Media = Tables<'media'>
+export type MediaInsert = TablesInsert<'media'>
+export type MediaUpdate = TablesUpdate<'media'>
+
+// Legacy type aliases for backward compatibility during migration
+export type Photo = Media
+export type PhotoInsert = MediaInsert
+export type PhotoUpdate = MediaUpdate
 
 export type EventWithDetails = Event & {
   profiles: Pick<Profile, 'email'>
-  photos?: Photo[]
+  media?: Media[]
+  photos?: Media[] // Legacy alias
   _count?: {
-    photos: number
+    media: number
+    photos: number // Legacy alias
     approved_photos: number
     pending_photos: number
   }
@@ -46,9 +53,12 @@ export type EventAssignmentWithDetails = EventAssignment & {
   assigned_by_profile: Pick<Profile, 'email'>
 }
 
-export type PhotoWithEvent = Photo & {
+export type MediaWithEvent = Media & {
   events: Pick<Event, 'title' | 'admin_id'>
 }
+
+// Legacy alias
+export type PhotoWithEvent = MediaWithEvent
 
 export type UserRole = 'admin' | 'user' | 'client'
 
