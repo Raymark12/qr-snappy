@@ -1,5 +1,5 @@
 import 'server-only'
-import ffmpeg from 'fluent-ffmpeg'
+import ffmpeg from '@renmu/fluent-ffmpeg'
 import ffmpegPath from '@ffmpeg-installer/ffmpeg'
 import ffprobePath from '@ffprobe-installer/ffprobe'
 import { MEDIA } from '@/lib/constants'
