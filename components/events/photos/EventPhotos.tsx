@@ -106,7 +106,7 @@ export default function EventPhotos({ event: initialEvent, canUpload }: EventPho
         {canUpload && (
           <ErrorBoundary>
             <Box sx={{ mb: 4 }}>
-              <PhotoUploader eventId={event.id} simple />
+              <PhotoUploader eventId={event.id} />
             </Box>
           </ErrorBoundary>
         )}
@@ -145,7 +145,7 @@ export default function EventPhotos({ event: initialEvent, canUpload }: EventPho
                 </Box>
               }
             >
-              <PhotosGrid photos={photos} eventId={event.id} />
+              <PhotosGrid photos={photos} eventId={event.id} infiniteScroll={true} />
             </Suspense>
           </ErrorBoundary>
         )}

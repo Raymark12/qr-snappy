@@ -121,7 +121,7 @@ export default function PublicEventPhotos({ event }: PublicEventPhotosProps) {
 
           <ErrorBoundary>
             <Box sx={{ mb: 4 }}>
-              <PhotoUploader eventId={event.id} publicMode={true} simple />
+              <PhotoUploader eventId={event.id} publicMode={true} />
             </Box>
           </ErrorBoundary>
 
@@ -159,7 +159,7 @@ export default function PublicEventPhotos({ event }: PublicEventPhotosProps) {
                   </Box>
                 }
               >
-                <PhotosGrid photos={photos} eventId={event.id} publicMode={true} />
+                <PhotosGrid eventId={event.id} publicMode={true} infiniteScroll={true} />
               </Suspense>
             </ErrorBoundary>
           )}

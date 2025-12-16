@@ -1,16 +1,3 @@
-// ============================================================================
-// TOAST STORE: Gestión de notificaciones globales
-// ============================================================================
-//
-// SE USA ZUSTAND AQUÍ PORQUE:
-// 1. ✅ Sin provider: No necesita wrapper de Provider
-// 2. ✅ Mejor rendimiento: Solo re-renderiza componentes que usan el store
-// 3. ✅ API simple: useToastStore() directamente
-// 4. ✅ Consistente: Usa el mismo patrón que authStore
-// 5. ✅ Accesible desde cualquier lugar (incluso fuera de React)
-//
-// ============================================================================
-
 import { create } from 'zustand'
 import { UI } from '@/lib/constants'
 

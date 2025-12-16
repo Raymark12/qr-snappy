@@ -1,5 +1,5 @@
 
-import { useQuery, useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type UseMutationResult } from '@tanstack/react-query'
 import type { Photo } from '@/types'
 import { QUERY } from '@/lib/constants'
 import { apiGet, apiPost, apiDelete } from '@/lib/utils/api-client'
@@ -18,7 +18,22 @@ async function fetchEventPhotos(eventId: string, publicMode = false): Promise<Ph
   return apiGet<Photo[]>(endpoint)
 }
 
-async function getUploadUrl(eventId: string, filename: string, contentType: string, publicMode = false) {
+async function fetchEventPhotosPaginated(
+  eventId: string,
+  cursor: string | null,
+  pageSize: number,
+  publicMode = false
+): Promise<{ data: Photo[]; hasMore: boolean; nextCursor: string | null }> {
+  const endpoint = publicMode ? `/api/public/events/${eventId}/photos` : `/api/events/${eventId}/photos`
+  const params = new URLSearchParams()
+  if (cursor) params.set('cursor', cursor)
+  params.set('limit', pageSize.toString())
+
+  const url = `${endpoint}?${params.toString()}`
+  return apiGet<{ data: Photo[]; hasMore: boolean; nextCursor: string | null }>(url)
+}
+
+export async function getUploadUrl(eventId: string, filename: string, contentType: string, publicMode = false) {
   const endpoint = publicMode ? `/api/public/events/${eventId}/photos/upload-url` : `/api/events/${eventId}/photos/upload-url`
   return apiPost<{ success: boolean; uploadUrl: string; filePath: string; fileName: string; userEmail?: string }>(endpoint, {
     fileName: filename,
@@ -55,7 +70,7 @@ async function uploadToR2(uploadUrl: string, file: File, onProgress?: (progress:
   })
 }
 
-async function completeUpload(
+export async function completeUpload(
   eventId: string,
   filePath: string,
   fileName: string,
@@ -108,6 +123,19 @@ export function useEventPhotos(eventId: string, publicMode = false, enabled = tr
   return useQuery({
     queryKey: [...photoKeys.event(eventId), publicMode ? 'public' : 'private'],
     queryFn: () => fetchEventPhotos(eventId, publicMode),
+    staleTime: QUERY.PHOTOS_STALE_TIME,
+    refetchInterval: QUERY.PHOTOS_REFETCH_INTERVAL,
+    refetchOnWindowFocus: false,
+    enabled,
+  })
+}
+
+export function useEventPhotosInfinite(eventId: string, publicMode = false, enabled = true, pageSize = 20) {
+  return useInfiniteQuery({
+    queryKey: [...photoKeys.event(eventId), publicMode ? 'public' : 'private', 'infinite'],
+    queryFn: ({ pageParam }) => fetchEventPhotosPaginated(eventId, pageParam, pageSize, publicMode),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
     staleTime: QUERY.PHOTOS_STALE_TIME,
     refetchInterval: QUERY.PHOTOS_REFETCH_INTERVAL,
     refetchOnWindowFocus: false,

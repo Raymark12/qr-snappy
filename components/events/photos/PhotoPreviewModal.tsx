@@ -85,9 +85,9 @@ export default function PhotoPreviewModal({
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box>
-          <Typography variant="h6">Preview Photos Before Upload</Typography>
+          <Typography variant="h6">Preview Media Before Upload</Typography>
           <Typography variant="caption" color="text.secondary">
-            {photos.length} {photos.length === 1 ? 'photo' : 'photos'} • {totalSizeMB} MB total
+            {photos.length} {photos.length === 1 ? 'file' : 'files'} • {totalSizeMB} MB total
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small">
@@ -142,6 +142,7 @@ export default function PhotoPreviewModal({
                       sx={{ position: 'absolute', top: 0, left: 0, zIndex: 1 }}
                     />
                   )}
+                  {photo.preview.startsWith('data:image/') || !photo.file.type.startsWith('video/') ? (
                   <CardMedia
                     component="img"
                     height="200"
@@ -152,6 +153,18 @@ export default function PhotoPreviewModal({
                     onLoad={() => handleImageLoad(photo.id)}
                     onError={() => handleImageLoad(photo.id)}
                   />
+                  ) : (
+                    <CardMedia
+                      component="video"
+                      height="200"
+                      src={photo.preview}
+                      controls
+                      sx={{ objectFit: 'cover' }}
+                      onLoadStart={() => handleImageLoadStart(photo.id)}
+                      onLoadedData={() => handleImageLoad(photo.id)}
+                      onError={() => handleImageLoad(photo.id)}
+                    />
+                  )}
                   <IconButton
                     onClick={() => onRemovePhoto(photo.id)}
                     sx={{
@@ -217,7 +230,7 @@ export default function PhotoPreviewModal({
           startIcon={<CloudUploadIcon />}
           disabled={photos.length === 0}
         >
-          Upload {photos.length} {photos.length === 1 ? 'Photo' : 'Photos'}
+          Upload {photos.length} {photos.length === 1 ? 'File' : 'Files'}
         </Button>
       </DialogActions>
     </Dialog>

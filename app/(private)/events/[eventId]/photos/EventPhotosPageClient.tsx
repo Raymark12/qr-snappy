@@ -18,6 +18,9 @@ export default function EventPhotosPageClient() {
 
   const { data: photos, isLoading, error } = useEventPhotos(eventId)
 
+  const pendingPhotos = photos?.filter(photo => photo.status === 'pending') || []
+  const approvedPhotos = photos?.filter(photo => photo.status === 'approved') || []
+
   if (isLoading) {
     return <LoadingSpinner message="Loading photos..." />
   }
@@ -35,8 +38,6 @@ export default function EventPhotosPageClient() {
     )
   }
 
-  const approvedPhotos = photos?.filter(photo => photo.status === 'approved') || []
-
   return (
     <AdminLayout>
       <Box sx={{ p: 3 }}>
@@ -50,9 +51,17 @@ export default function EventPhotosPageClient() {
         </Box>
 
         <Box sx={{ mb: 4 }}>
-          <PhotoUploader eventId={eventId} simple />
+          <PhotoUploader eventId={eventId} />
         </Box>
 
+        {pendingPhotos.length > 0 && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
+              Pending Approval ({pendingPhotos.length})
+            </Typography>
+            <PhotosGrid photos={pendingPhotos} eventId={eventId} infiniteScroll={false} />
+          </Box>
+        )}
         {isLoading ? (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
@@ -60,14 +69,14 @@ export default function EventPhotosPageClient() {
             </Typography>
             <PhotosGridSkeleton />
           </Box>
-        ) : approvedPhotos.length > 0 ? (
+        ) : (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-              Approved Photos ({approvedPhotos.length})
+              Approved Photos {approvedPhotos.length > 0 && `(${approvedPhotos.length})`}
             </Typography>
-            <PhotosGrid photos={approvedPhotos} eventId={eventId} />
+            <PhotosGrid eventId={eventId} infiniteScroll={true} />
           </Box>
-        ) : null}
+        )}
 
         {photos?.length === 0 && (
           <Box sx={{ textAlign: 'center', py: 8 }}>

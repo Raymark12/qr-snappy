@@ -1,21 +1,23 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Box, CircularProgress, IconButton, Tooltip, Button } from '@mui/material'
+import { Box, CircularProgress, IconButton, Tooltip, Button, Chip } from '@mui/material'
 import Image from 'next/image'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import DownloadIcon from '@mui/icons-material/Download'
 import DeleteIcon from '@mui/icons-material/Delete'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import type { Photo } from '@/types'
+import type { Media } from '@/types'
 import { getImageUrl } from '@/lib/actions/image-url'
 import { useIsEventModerator, useIsAdmin } from '@/hooks/useAuth'
 import { usePhotoActions } from '@/hooks/usePhotoActions'
 import { isVideoFileName } from '@/lib/utils/file-validation'
+import { useLazyImage } from '@/hooks/useLazyImage'
+import { useMediaUrl } from '@/hooks/useMediaUrl'
 import ConfirmDialog from './ConfirmDialog'
 
 interface PhotoItemProps {
-  photo: Photo
+  photo: Media
   eventId: string
   onClick?: () => void
   priority?: boolean
@@ -29,9 +31,9 @@ export default function PhotoItem({
   priority = false,
   publicMode = false,
 }: PhotoItemProps) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageError, setImageError] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [useVideoFallback, setUseVideoFallback] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [confirmDialogType, setConfirmDialogType] = useState<'reject' | 'delete'>('reject')
   const isModerator = useIsEventModerator(eventId)
@@ -42,12 +44,28 @@ export default function PhotoItem({
 
   const { approvePhoto, rejectPhoto, deletePhoto } = usePhotoActions(eventId)
 
+  const { elementRef, isInView } = useLazyImage({
+    onLoad: () => setLoading(false),
+    onError: () => {
+      setImageError(true)
+      setLoading(false)
+    },
+  })
+
   const hasValidFilePath = useMemo(
-    () => photo.file_path && photo.file_path !== '',
+    () => Boolean(photo.file_path && photo.file_path !== ''),
     [photo.file_path]
   )
 
-  const isVideo = useMemo(() => isVideoFileName(photo.file_name), [photo.file_name])
+  const hasThumbnail = useMemo(
+    () => photo.thumbnail_path && photo.thumbnail_path !== '',
+    [photo.thumbnail_path]
+  )
+
+  const isVideo = useMemo(
+    () => photo.media_type === 'video' || isVideoFileName(photo.file_name),
+    [photo.media_type, photo.file_name]
+  )
 
   const stopEventPropagation = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
@@ -56,37 +74,36 @@ export default function PhotoItem({
     }
   }
 
+  const pathToLoad = hasThumbnail && !useVideoFallback ? photo.thumbnail_path! : photo.file_path
+
+  const {
+    data: mediaUrl,
+    isLoading: isUrlLoading,
+    isError: isUrlError,
+  } = useMediaUrl(pathToLoad, {
+    enabled: isInView && hasValidFilePath,
+    publicMode,
+    eventId,
+  })
+
   useEffect(() => {
-    if (!hasValidFilePath) {
-      setLoading(false)
-      setImageUrl(null)
-      return
+    if (isUrlError) {
+      if (hasThumbnail && !useVideoFallback) {
+        setUseVideoFallback(true)
+      } else {
+        setImageError(true)
+        setLoading(false)
+      }
     }
+  }, [isUrlError, hasThumbnail, useVideoFallback])
 
-    setImageError(false)
-    setLoading(true)
-
-    let cancelled = false
-
-    getImageUrl(photo.file_path, { publicMode, eventId })
-      .then(url => {
-        if (!cancelled) {
-          setImageUrl(url)
-          setLoading(false)
-        }
-      })
-      .catch(err => {
-        if (!cancelled) {
-          console.error('Failed to get image URL:', err)
-          setImageError(true)
-          setLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
+  // Reset loading when URL changes
+  useEffect(() => {
+    if (mediaUrl) {
+      setLoading(true)
+      setImageError(false)
     }
-  }, [hasValidFilePath, photo.file_path, publicMode, eventId])
+  }, [mediaUrl])
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -149,9 +166,20 @@ export default function PhotoItem({
     }
   }
 
-  if (loading || !hasValidFilePath) {
+  // Format file size for display
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return null
+    const mb = bytes / (1024 * 1024)
+    if (mb < 1) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${mb.toFixed(1)} MB`
+  }
+
+  const fileSizeLabel = formatFileSize(photo.file_size)
+
+  if (!isInView || isUrlLoading || (loading && !mediaUrl) || !hasValidFilePath) {
     return (
       <Box
+        ref={elementRef as React.RefObject<HTMLDivElement>}
         sx={{
           position: 'relative',
           width: '100%',
@@ -172,15 +200,16 @@ export default function PhotoItem({
             justifyContent: 'center',
           }}
         >
-          <CircularProgress size={32} />
+          {loading && <CircularProgress size={32} />}
         </Box>
       </Box>
     )
   }
 
-  if (imageError || !imageUrl) {
+  if (imageError || isUrlError || !mediaUrl) {
     return (
       <Box
+        ref={elementRef as React.RefObject<HTMLDivElement>}
         sx={{
           position: 'relative',
           width: '100%',
@@ -214,6 +243,7 @@ export default function PhotoItem({
 
   return (
     <Box
+      ref={elementRef as React.RefObject<HTMLDivElement>}
       sx={{
         position: 'relative',
         width: '100%',
@@ -232,37 +262,59 @@ export default function PhotoItem({
         sx={{
           position: 'absolute',
           inset: 0,
-          cursor: imageUrl && hasValidFilePath ? 'pointer' : 'default',
+          cursor: mediaUrl && hasValidFilePath ? 'pointer' : 'default',
         }}
         onClick={() => {
-          if (imageUrl && hasValidFilePath) {
+          if (mediaUrl && hasValidFilePath) {
             onClick?.()
           }
         }}
       >
         {isVideo ? (
-          <video
-            src={imageUrl || undefined}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transition: 'transform 0.3s ease-out',
-              willChange: 'transform',
-            }}
-            className="image"
-            muted
-            playsInline
-            onLoadedData={() => setLoading(false)}
-            onError={() => {
-              console.error('Failed to load video:', imageUrl)
-              setImageError(true)
-              setLoading(false)
-            }}
-          />
+          hasThumbnail && !useVideoFallback ? (
+            <Image
+              src={mediaUrl}
+              alt="Video thumbnail"
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              style={{
+                objectFit: 'cover',
+                transition: 'transform 0.3s ease-out',
+                willChange: 'transform',
+              }}
+              className="image"
+              unoptimized
+              priority={priority}
+              onLoad={() => setLoading(false)}
+              onError={() => {
+                console.warn('Failed to load video thumbnail, falling back to video:', mediaUrl)
+                setUseVideoFallback(true)
+              }}
+            />
+          ) : (
+            <video
+              src={mediaUrl || undefined}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transition: 'transform 0.3s ease-out',
+                willChange: 'transform',
+              }}
+              className="image"
+              muted
+              playsInline
+              onLoadedData={() => setLoading(false)}
+              onError={() => {
+                console.error('Failed to load video:', mediaUrl)
+                setImageError(true)
+                setLoading(false)
+              }}
+            />
+          )
         ) : (
           <Image
-            src={imageUrl}
+            src={mediaUrl}
             alt="Event photo"
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
@@ -276,7 +328,7 @@ export default function PhotoItem({
             priority={priority}
             onLoad={() => setLoading(false)}
             onError={() => {
-              console.error('Failed to load image:', imageUrl)
+              console.error('Failed to load image:', mediaUrl)
               setImageError(true)
               setLoading(false)
             }}
@@ -304,6 +356,25 @@ export default function PhotoItem({
           </Box>
         )}
       </Box>
+
+      {fileSizeLabel && (
+        <Chip
+          label={fileSizeLabel}
+          size="small"
+          sx={{
+            position: 'absolute',
+            bottom: 8,
+            left: 8,
+            height: 20,
+            fontSize: 10,
+            bgcolor: 'rgba(0,0,0,0.7)',
+            color: 'white',
+            '& .MuiChip-label': {
+              px: 1,
+            },
+          }}
+        />
+      )}
       {hasValidFilePath && (
         <Tooltip title={`Download ${isVideo ? 'video' : 'photo'}`} placement="top">
           <IconButton
