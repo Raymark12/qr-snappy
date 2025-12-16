@@ -145,7 +145,7 @@ export default function EventPhotos({ event: initialEvent, canUpload }: EventPho
                 </Box>
               }
             >
-              <PhotosGrid photos={photos} eventId={event.id} infiniteScroll={true} />
+              <PhotosGrid eventId={event.id} infiniteScroll={true} />
             </Suspense>
           </ErrorBoundary>
         )}

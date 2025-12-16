@@ -132,6 +132,17 @@ export default function PhotosGrid({
     )
   }
 
+  if (infiniteScroll && infiniteQuery.isLoading && !allPhotos.length) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 6 }}>
+        <CircularProgress size={40} />
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          Loading photos...
+        </Typography>
+      </Box>
+    )
+  }
+
   return (
     <>
       <Box
