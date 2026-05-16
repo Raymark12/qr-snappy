@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import axios, { AxiosProgressEvent, CancelTokenSource } from 'axios'
+import { r2PutObjectContentType } from '@/lib/utils/file-validation'
 
 export interface UploadProgress {
   fileIndex: number
@@ -65,7 +66,7 @@ export function useAxiosUpload(options?: UseAxiosUploadOptions) {
 
       await axios.put(uploadUrl, file, {
         headers: {
-          'Content-Type': file.type,
+          'Content-Type': r2PutObjectContentType(file),
         },
         cancelToken: cancelSource.token,
         onUploadProgress: (progressEvent: AxiosProgressEvent) => {

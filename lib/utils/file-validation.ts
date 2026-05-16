@@ -80,3 +80,8 @@ export function getMediaStoragePath(eventId: string, filename: string): string {
   return `${bucketName}/events/${eventId}/photos/${objectName}`
 }
 
+/** MIME for R2 presigned PUT: must match the Content-Type header on the browser PUT. */
+export function r2PutObjectContentType(file: Pick<File, 'type'>): string {
+  return file.type?.trim() || 'application/octet-stream'
+}
+

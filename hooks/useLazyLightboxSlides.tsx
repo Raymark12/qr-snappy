@@ -5,6 +5,10 @@ import type { Media } from '@/types'
 import { Box, CircularProgress } from '@mui/material'
 import { isVideoFileName } from '@/lib/utils/file-validation'
 
+/** Valid placeholder so Lightbox never receives `src=""` (triggers React / browser warnings). */
+const PLACEHOLDER_IMAGE_SRC =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+
 interface UseLazyLightboxSlidesOptions {
   photos: Media[]
   initialIndex: number
@@ -71,6 +75,11 @@ export function useLazyLightboxSlides({
           gcTime: 60 * 60 * 1000, // 1 hour
         })
 
+        if (typeof url !== 'string' || !url.trim()) {
+          console.error(`Empty media URL for slide ${slideIndex}, path:`, pathToLoad)
+          return null
+        }
+
         let posterUrl: string | undefined
         if (isVideo && photo.thumbnail_path) {
           try {
@@ -93,7 +102,7 @@ export function useLazyLightboxSlides({
           ? {
               type: 'video' as const,
               sources: [{ src: url, type: 'video/mp4' }],
-              poster: posterUrl,
+              poster: posterUrl?.trim() || undefined,
               title: '',
               description,
             }
@@ -170,7 +179,7 @@ export function useLazyLightboxSlides({
   const createLoadingSlide = useCallback(
     (): Slide => ({
       type: 'image' as const,
-      src: '',
+      src: PLACEHOLDER_IMAGE_SRC,
       title: '',
       description: (
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>

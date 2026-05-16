@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiPost } from '@/lib/utils/api-client'
+import { r2PutObjectContentType } from '@/lib/utils/file-validation'
 import type { Photo } from '@/types'
 
 export interface UploadUrlResponse {
@@ -128,14 +129,14 @@ export function useUploadPhoto() {
       const urlResult = await getUploadUrl.mutateAsync({
         eventId,
         fileName: file.name,
-        contentType: file.type,
+        contentType: r2PutObjectContentType(file),
       })
 
       const uploadResponse = await fetch(urlResult.uploadUrl, {
         method: 'PUT',
         body: file,
         headers: {
-          'Content-Type': file.type,
+          'Content-Type': r2PutObjectContentType(file),
         },
       })
 
@@ -171,7 +172,7 @@ export function useUploadPhotosBatch() {
       try {
         const urlResult = await getBatchUploadUrls.mutateAsync({
           eventId,
-          files: files.map(file => ({ name: file.name, type: file.type })),
+          files: files.map(file => ({ name: file.name, type: r2PutObjectContentType(file) })),
         })
 
         const uploadPromises = urlResult.uploads.map(async (upload, index) => {
@@ -181,7 +182,7 @@ export function useUploadPhotosBatch() {
               method: 'PUT',
               body: file,
               headers: {
-                'Content-Type': file.type,
+                'Content-Type': r2PutObjectContentType(file),
               },
             })
 

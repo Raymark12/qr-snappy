@@ -7,6 +7,7 @@ import { getUploadUrl, completeUpload, photoKeys } from '@/hooks/usePhotos'
 import { useAxiosUpload } from '@/hooks/useAxiosUpload'
 import { useQueryClient } from '@tanstack/react-query'
 import { FILE_UPLOAD } from '@/lib/constants'
+import { r2PutObjectContentType } from '@/lib/utils/file-validation'
 import { useToastStore } from '@/stores/toastStore'
 import { useAuth } from '@/hooks/useAuth'
 import PhotoPreviewModal, { type PhotoPreviewItem } from './PhotoPreviewModal'
@@ -173,7 +174,7 @@ export default function PhotoUploader({ eventId, publicMode = false }: PhotoUplo
     })
 
     await uploadFiles(uploadFilesList, async (file, index) => {
-      const result = await getUploadUrl(eventId, file.name, file.type, publicMode)
+      const result = await getUploadUrl(eventId, file.name, r2PutObjectContentType(file), publicMode)
       filePathsRef.current.set(index, result.filePath)
       return result.uploadUrl
     })

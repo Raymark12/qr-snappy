@@ -2,7 +2,8 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type UseMutationResult } from '@tanstack/react-query'
 import type { Photo } from '@/types'
 import { QUERY } from '@/lib/constants'
-import { apiGet, apiPost, apiDelete } from '@/lib/utils/api-client'
+import { apiGet, apiGetFull, apiPost, apiDelete } from '@/lib/utils/api-client'
+import { r2PutObjectContentType } from '@/lib/utils/file-validation'
 
 export const photoKeys = {
   all: ['photos'] as const,
@@ -30,7 +31,7 @@ async function fetchEventPhotosPaginated(
   params.set('limit', pageSize.toString())
 
   const url = `${endpoint}?${params.toString()}`
-  return apiGet<{ data: Photo[]; hasMore: boolean; nextCursor: string | null }>(url)
+  return apiGetFull<{ data: Photo[]; hasMore: boolean; nextCursor: string | null }>(url)
 }
 
 export async function getUploadUrl(eventId: string, filename: string, contentType: string, publicMode = false) {
@@ -65,7 +66,8 @@ async function uploadToR2(uploadUrl: string, file: File, onProgress?: (progress:
     })
 
     xhr.open('PUT', uploadUrl)
-    xhr.setRequestHeader('Content-Type', file.type)
+    // Must match presigned PutObject ContentType (server defaults empty file.type to application/octet-stream).
+    xhr.setRequestHeader('Content-Type', r2PutObjectContentType(file))
     xhr.send(file)
   })
 }
@@ -95,7 +97,7 @@ async function uploadPhoto(
 ): Promise<{ success: boolean; id: string }> {
   try {
     //Get pre-signed upload URL
-    const urlResult = await getUploadUrl(eventId, data.file.name, data.file.type, publicMode)
+    const urlResult = await getUploadUrl(eventId, data.file.name, r2PutObjectContentType(data.file), publicMode)
 
     if (!urlResult.uploadUrl || !urlResult.filePath) {
       throw new Error('Failed to get upload URL')

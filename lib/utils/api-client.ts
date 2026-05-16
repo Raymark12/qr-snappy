@@ -60,6 +60,23 @@ export function createInternalServerErrorResponse(): ApiResponse<never> {
   }
 }
 
+async function errorMessageFromFailedResponse(response: Response): Promise<string> {
+  let errorMessage = `Request failed with status ${response.status}`
+  try {
+    const errorData = await response.json()
+    if (typeof errorData.error === 'object' && errorData.error?.message) {
+      errorMessage = errorData.error.message
+    } else if (typeof errorData.error === 'string') {
+      errorMessage = errorData.error
+    } else if (typeof errorData.message === 'string') {
+      errorMessage = errorData.message
+    }
+  } catch {
+    // keep default message
+  }
+  return errorMessage
+}
+
 /**
  * Makes an API request with consistent error handling
  * @param url - The API endpoint URL
@@ -90,37 +107,58 @@ export async function apiRequest<T = unknown>(
   })
 
   if (!response.ok) {
-    let errorMessage = `Request failed with status ${response.status}`
-    try {
-      const errorData = await response.json()
-      if (typeof errorData.error === 'object' && errorData.error?.message) {
-        errorMessage = errorData.error.message
-      } else if (typeof errorData.error === 'string') {
-        errorMessage = errorData.error
-      } else if (typeof errorData.message === 'string') {
-        errorMessage = errorData.message
-      }
-    } catch {
-      // If we can't parse the error response, use the status message
-    }
-    throw new Error(errorMessage)
+    throw new Error(await errorMessageFromFailedResponse(response))
   }
 
+  let result: ApiResponse<T>
   try {
-    const result: ApiResponse<T> = await response.json()
-
-    if (result.success === false) {
-      throw new Error(result.error || 'Request failed')
-    }
-
-    return (result.data ?? result) as T
+    result = (await response.json()) as ApiResponse<T>
   } catch {
     throw new Error('Failed to parse response')
   }
+
+  if (result.success === false) {
+    throw new Error(result.error || 'Request failed')
+  }
+
+  return (result.data ?? result) as T
 }
 
 export async function apiGet<T = unknown>(url: string): Promise<T> {
   return apiRequest<T>(url, { method: 'GET' })
+}
+
+/**
+ * GET and return the parsed JSON body as-is (no `result.data` unwrap).
+ * Use when the route returns several top-level fields, e.g. `{ data, hasMore, nextCursor }`.
+ */
+export async function apiGetFull<T = unknown>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    throw new Error(await errorMessageFromFailedResponse(response))
+  }
+
+  let result: unknown
+  try {
+    result = await response.json()
+  } catch {
+    throw new Error('Failed to parse response')
+  }
+
+  if (
+    result &&
+    typeof result === 'object' &&
+    'success' in result &&
+    (result as ApiResponse).success === false
+  ) {
+    throw new Error((result as ApiResponse).error || 'Request failed')
+  }
+
+  return result as T
 }
 
 export async function apiPost<T = unknown>(url: string, body?: unknown): Promise<T> {
