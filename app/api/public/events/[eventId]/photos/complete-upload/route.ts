@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdmin } from '@/lib/supabase/client'
-import { queueMediaProcessing } from '@/lib/jobs/media-processor'
 import { isVideoFileName } from '@/lib/utils/file-validation'
 import { z } from 'zod'
 
@@ -76,16 +75,19 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to save media' }, { status: 500 })
     }
 
-    // Queue background processing for thumbnails and video previews
-    queueMediaProcessing({
-      mediaId: media.id,
-      eventId,
-      filePath,
-      fileName,
-      fileSize: fileSize || 0,
-    }).catch(error => {
-      console.error('Failed to queue media processing:', error)
-    })
+    void import('@/lib/jobs/media-processor')
+      .then(({ queueMediaProcessing }) =>
+        queueMediaProcessing({
+          mediaId: media.id,
+          eventId,
+          filePath,
+          fileName,
+          fileSize: fileSize || 0,
+        })
+      )
+      .catch(error => {
+        console.error('Failed to queue media processing:', error)
+      })
 
     return NextResponse.json(media)
   } catch (error) {
